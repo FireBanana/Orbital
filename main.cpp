@@ -231,6 +231,37 @@ void make_pipeline()
     raster_info.polygonMode = VK_POLYGON_MODE_FILL;
     raster_info.depthBiasEnable = false;
     raster_info.lineWidth = 1.0;
+
+    std::vector<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
+                                                  VK_DYNAMIC_STATE_SCISSOR,
+                                                  VK_DYNAMIC_STATE_CULL_MODE};
+
+    VkPipelineColorBlendAttachmentState blend_attachment{};
+    blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+                                      | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+    VkPipelineColorBlendStateCreateInfo blend_state_info{
+        VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
+    blend_state_info.attachmentCount = 1;
+    blend_state_info.pAttachments = &blend_attachment;
+
+    VkPipelineViewportStateCreateInfo viewport_state{
+        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
+    viewport_state.viewportCount = 1;
+    viewport_state.scissorCount = 1;
+
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_state{
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
+    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+
+    VkPipelineMultisampleStateCreateInfo multisample_state{
+        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
+    multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineDynamicStateCreateInfo dynamic_state_info{
+        VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
+    dynamic_state_info.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
+    dynamic_state_info.pDynamicStates = dynamic_states.data();
 }
 
 int main()
@@ -258,6 +289,8 @@ int main()
     make_swapchain();
 
     glfwMakeContextCurrent(w);
+
+    glfwShowWindow(w);
 
     while (!glfwWindowShouldClose(w)) {
         glfwPollEvents();

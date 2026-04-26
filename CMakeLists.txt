@@ -9,7 +9,7 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 
-add_executable(Orbital main.cpp)
+add_executable(Orbital main.cpp shaders/triangle.vert.slang shaders/triangle.frag.slang)
 
 include(GNUInstallDirs)
 
