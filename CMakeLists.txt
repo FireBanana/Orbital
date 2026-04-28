@@ -13,6 +13,8 @@ add_executable(Orbital main.cpp shaders/triangle.vert.slang shaders/triangle.fra
 
 include(GNUInstallDirs)
 
+target_compile_definitions(Orbital PRIVATE ROOT="${CMAKE_SOURCE_DIR}/")
+
 target_link_libraries(Orbital PRIVATE Vulkan::Vulkan glfw)
 
 install(TARGETS Orbital

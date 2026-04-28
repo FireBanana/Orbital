@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <array>
+#include <fstream>
 #include <glm/glm.hpp>
 #include <iostream>
 #include <vector>
@@ -11,6 +12,7 @@
 constexpr uint32_t QUEUE_INDEX = 0;
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
+constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
 
 VkInstance g_instance;
 VkPhysicalDevice g_physical_device;
@@ -18,6 +20,7 @@ VkDevice g_device;
 VkQueue g_queue;
 VkSurfaceKHR g_surface;
 VkSwapchainKHR g_swapchain;
+VkPipeline g_pipeline;
 
 VkBuffer g_triangle_buffer;
 
@@ -48,6 +51,33 @@ uint32_t find_memory_type(
     }
 
     throw;
+}
+
+VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits bits)
+{
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file)
+        throw;
+
+    auto byteSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    if (byteSize % sizeof(uint32_t) != 0)
+        throw;
+
+    std::vector<uint32_t> buffer(byteSize / sizeof(uint32_t));
+    file.read(reinterpret_cast<char *>(buffer.data()), byteSize);
+
+    VkShaderModuleCreateInfo create_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    create_info.codeSize = buffer.size() * sizeof(uint32_t);
+    create_info.pCode = buffer.data();
+
+    VkShaderModule module;
+    if (vkCreateShaderModule(g_device, &create_info, nullptr, &module))
+        std::cout << "Shader made" << std::endl;
+    else
+        std::cout << "Shader failed" << std::endl;
+    return module;
 }
 
 void make_instance()
@@ -172,7 +202,7 @@ void make_swapchain()
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     info.surface = g_surface;
     info.minImageCount = desired_images;
-    info.imageFormat = VK_FORMAT_B8G8R8A8_SRGB; //Assuming we have this
+    info.imageFormat = FORMAT; //Assuming we have this
     info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     info.imageExtent = swapchain_size;
     info.imageArrayLayers = 1;
@@ -191,10 +221,10 @@ void make_swapchain()
 
 void make_pipeline()
 {
-    VkPipelineLayoutCreateInfo info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     VkPipelineLayout layout;
 
-    vkCreatePipelineLayout(g_device, &info, nullptr, &layout);
+    vkCreatePipelineLayout(g_device, &layout_info, nullptr, &layout);
 
     VkVertexInputBindingDescription binding_desc{};
     binding_desc.binding = 0;
@@ -262,7 +292,49 @@ void make_pipeline()
         VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
     dynamic_state_info.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
     dynamic_state_info.pDynamicStates = dynamic_states.data();
+
+    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
+        {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          .stage = VK_SHADER_STAGE_VERTEX_BIT,
+          .module = get_shader_module(ROOT "shaders/triangle.vert.spirv",
+                                      VK_SHADER_STAGE_VERTEX_BIT),
+          .pName = "main"},
+         {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+          .module = get_shader_module(ROOT "shaders/triangle.frag.spirv",
+                                      VK_SHADER_STAGE_FRAGMENT_BIT),
+          .pName = "main"}}};
+
+    VkPipelineRenderingCreateInfo rendering_info{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachmentFormats = &FORMAT;
+
+    VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
+    info.pNext = &rendering_info;
+    info.stageCount = static_cast<uint32_t>(shader_stages.size());
+    info.pStages = shader_stages.data();
+    info.pVertexInputState = &vertex_state_info;
+    info.pInputAssemblyState = &input_assembly;
+    info.pViewportState = &viewport_state;
+    info.pRasterizationState = &raster_info;
+    info.pMultisampleState = &multisample_state;
+    info.pDepthStencilState = &depth_stencil_state;
+    info.pColorBlendState = &blend_state_info;
+    info.pDynamicState = &dynamic_state_info;
+    info.layout = layout;
+    info.renderPass = VK_NULL_HANDLE;
+    info.subpass = 0;
+
+    if (vkCreateGraphicsPipelines(g_device, VK_NULL_HANDLE, 1, &info, nullptr, &g_pipeline)
+        == VK_SUCCESS)
+        std::cout << "pipeline made" << std::endl;
+    else
+        std::cout << "pipeline failed" << std::endl;
+
+    //delete shader modules
 }
+
+VkResult aquire_swapchain_image();
 
 int main()
 {
@@ -287,6 +359,7 @@ int main()
         std::cout << "Surface creation failed " << res << std::endl;
 
     make_swapchain();
+    make_pipeline();
 
     glfwMakeContextCurrent(w);
 
