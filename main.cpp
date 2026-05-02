@@ -13,6 +13,8 @@ constexpr uint32_t QUEUE_INDEX = 0;
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
 constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
+constexpr uint32_t SWAPCHAIN_SIZE = 3;
+constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 VkInstance g_instance;
 VkPhysicalDevice g_physical_device;
@@ -21,6 +23,12 @@ VkQueue g_queue;
 VkSurfaceKHR g_surface;
 VkSwapchainKHR g_swapchain;
 VkPipeline g_pipeline;
+
+// Per frame data
+std::array<VkSemaphore, FRAMES_IN_FLIGHT> g_acquire_semaphores;
+std::array<VkSemaphore, FRAMES_IN_FLIGHT> g_present_semaphores;
+std::array<VkFence, FRAMES_IN_FLIGHT> g_fences;
+std::array<VkCommandPool, FRAMES_IN_FLIGHT> g_command_pool;
 
 VkBuffer g_triangle_buffer;
 
@@ -73,7 +81,7 @@ VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits b
     create_info.pCode = buffer.data();
 
     VkShaderModule module;
-    if (vkCreateShaderModule(g_device, &create_info, nullptr, &module))
+    if (vkCreateShaderModule(g_device, &create_info, nullptr, &module) == VK_SUCCESS)
         std::cout << "Shader made" << std::endl;
     else
         std::cout << "Shader failed" << std::endl;
@@ -197,7 +205,7 @@ void make_swapchain()
     swapchain_size.width = WIDTH;
     swapchain_size.height = HEIGHT;
 
-    uint32_t desired_images = 3; //Assuming more than min
+    uint32_t desired_images = SWAPCHAIN_SIZE; //Assuming more than min
 
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     info.surface = g_surface;
@@ -334,7 +342,39 @@ void make_pipeline()
     //delete shader modules
 }
 
-VkResult aquire_swapchain_image();
+void init_per_frame();
+
+void render_triangle(uint32_t swapchain_index) {}
+
+VkResult present_image(uint32_t index) {}
+
+VkResult acquire_swapchain_image(uint32_t *img)
+{
+    static uint32_t current_frame = 0;
+
+    auto res = vkAcquireNextImageKHR(g_device,
+                                     g_swapchain,
+                                     UINT64_MAX,
+                                     g_acquire_semaphores[current_frame],
+                                     VK_NULL_HANDLE,
+                                     img);
+
+    if (res != VK_SUCCESS)
+        return res;
+
+    if (g_fences[*img] != VK_NULL_HANDLE) {
+        vkWaitForFences(g_device, 1, &g_fences[*img], true, UINT64_MAX);
+        vkResetFences(g_device, 1, &g_fences[*img]);
+    }
+
+    if (g_command_pool[*img] != VK_NULL_HANDLE) {
+        vkResetCommandPool(g_device, g_command_pool[*img], 0);
+    }
+
+    current_frame = (current_frame + 1) % FRAMES_IN_FLIGHT;
+
+    return res;
+}
 
 int main()
 {
@@ -360,12 +400,24 @@ int main()
 
     make_swapchain();
     make_pipeline();
+    init_per_frame();
 
     glfwMakeContextCurrent(w);
 
     glfwShowWindow(w);
 
     while (!glfwWindowShouldClose(w)) {
+        uint32_t frame;
+        auto r = acquire_swapchain_image(&frame);
+
+        if (r != VK_SUCCESS) {
+            vkQueueWaitIdle(g_queue);
+            continue;
+        }
+
+        render_triangle(frame);
+        r = present_image(frame);
+
         glfwPollEvents();
     }
 }
