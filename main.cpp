@@ -29,6 +29,7 @@ std::array<VkSemaphore, FRAMES_IN_FLIGHT> g_acquire_semaphores;
 std::array<VkSemaphore, FRAMES_IN_FLIGHT> g_present_semaphores;
 std::array<VkFence, FRAMES_IN_FLIGHT> g_fences;
 std::array<VkCommandPool, FRAMES_IN_FLIGHT> g_command_pool;
+std::array<VkCommandBuffer, FRAMES_IN_FLIGHT> g_command_buffers;
 
 VkBuffer g_triangle_buffer;
 
@@ -100,7 +101,7 @@ void make_instance()
 
     VkApplicationInfo app_info{};
     app_info.pApplicationName = "Orbital";
-    app_info.apiVersion = VK_MAKE_API_VERSION(0, 1, 4, 0);
+    app_info.apiVersion = VK_API_VERSION_1_4;
 
     uint32_t ext_count = 0;
     auto extensions = glfwGetRequiredInstanceExtensions(&ext_count);
@@ -133,7 +134,13 @@ void make_device()
     // Assume we pick queue 0
 
     float priority = 0.5;
-    const char *extensions[] = {"VK_KHR_swapchain"};
+    const char *extensions[] = {"VK_KHR_swapchain", "VK_KHR_dynamic_rendering"};
+
+    VkPhysicalDeviceVulkan13Features enable_vulkan13_features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .synchronization2 = VK_TRUE,
+        .dynamicRendering = VK_TRUE,
+    };
 
     VkDeviceQueueCreateInfo queue_info{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     queue_info.queueFamilyIndex = QUEUE_INDEX;
@@ -141,10 +148,11 @@ void make_device()
     queue_info.pQueuePriorities = &priority;
 
     VkDeviceCreateInfo device_info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
+    device_info.pNext = &enable_vulkan13_features;
     device_info.queueCreateInfoCount = 1;
     device_info.pQueueCreateInfos = &queue_info;
     device_info.ppEnabledExtensionNames = extensions;
-    device_info.enabledExtensionCount = 1;
+    device_info.enabledExtensionCount = 2;
 
     if (vkCreateDevice(devices[0], &device_info, nullptr, &g_device) == VK_SUCCESS)
         std::cout << "Created device" << std::endl;
@@ -270,9 +278,8 @@ void make_pipeline()
     raster_info.depthBiasEnable = false;
     raster_info.lineWidth = 1.0;
 
-    std::vector<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
-                                                  VK_DYNAMIC_STATE_SCISSOR,
-                                                  VK_DYNAMIC_STATE_CULL_MODE};
+    std::vector<VkDynamicState> dynamic_states
+        = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE};
 
     VkPipelineColorBlendAttachmentState blend_attachment{};
     blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
@@ -304,13 +311,11 @@ void make_pipeline()
     std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
         {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = get_shader_module(ROOT "shaders/triangle.vert.spirv",
-                                      VK_SHADER_STAGE_VERTEX_BIT),
+          .module = get_shader_module(ROOT "shaders/triangle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
           .pName = "main"},
          {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = get_shader_module(ROOT "shaders/triangle.frag.spirv",
-                                      VK_SHADER_STAGE_FRAGMENT_BIT),
+          .module = get_shader_module(ROOT "shaders/triangle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
           .pName = "main"}}};
 
     VkPipelineRenderingCreateInfo rendering_info{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
@@ -342,22 +347,49 @@ void make_pipeline()
     //delete shader modules
 }
 
-void init_per_frame();
+void init_per_frame(int index)
+{
+    VkFenceCreateInfo info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    if (vkCreateFence(g_device, &info, nullptr, &g_fences[index]) == VK_SUCCESS)
+        std::cout << "Fence made" << std::endl;
+    else
+        std::cout << "Fence failed" << std::endl;
+
+    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    pool_info.queueFamilyIndex = static_cast<uint32_t>(QUEUE_INDEX);
+
+    if (vkCreateCommandPool(g_device, &pool_info, nullptr, &g_command_pool[index]) == VK_SUCCESS)
+        std::cout << "pool made" << std::endl;
+    else
+        std::cout << "pool failed" << std::endl;
+
+    VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    buf_info.commandPool = g_command_pool[index];
+    buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    buf_info.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(g_device, &buf_info, &g_command_buffers[index]) == VK_SUCCESS)
+        std::cout << "buffer made" << std::endl;
+    else
+        std::cout << "buffer failed" << std::endl;
+}
 
 void render_triangle(uint32_t swapchain_index) {}
 
-VkResult present_image(uint32_t index) {}
+VkResult present_image(uint32_t index)
+{
+    return VK_SUCCESS;
+}
 
 VkResult acquire_swapchain_image(uint32_t *img)
 {
     static uint32_t current_frame = 0;
 
-    auto res = vkAcquireNextImageKHR(g_device,
-                                     g_swapchain,
-                                     UINT64_MAX,
-                                     g_acquire_semaphores[current_frame],
-                                     VK_NULL_HANDLE,
-                                     img);
+    auto res = vkAcquireNextImageKHR(
+        g_device, g_swapchain, UINT64_MAX, g_acquire_semaphores[current_frame], VK_NULL_HANDLE, img);
 
     if (res != VK_SUCCESS)
         return res;
@@ -400,7 +432,9 @@ int main()
 
     make_swapchain();
     make_pipeline();
-    init_per_frame();
+
+    for (int i = 0; i < FRAMES_IN_FLIGHT; ++i)
+        init_per_frame(i);
 
     glfwMakeContextCurrent(w);
 
