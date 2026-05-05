@@ -16,6 +16,15 @@ constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
 constexpr uint32_t SWAPCHAIN_SIZE = 3;
 constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
+struct Frame
+{
+    VkFence fence;
+    VkSemaphore acquireSemaphore;
+    VkSemaphore releaseSemaphore;
+    VkCommandPool pool;
+    VkCommandBuffer buffer;
+};
+
 VkInstance g_instance;
 VkPhysicalDevice g_physical_device;
 VkDevice g_device;
@@ -24,12 +33,12 @@ VkSurfaceKHR g_surface;
 VkSwapchainKHR g_swapchain;
 VkPipeline g_pipeline;
 
+std::vector<VkImage> g_swapchain_images;
+std::vector<VkImageView> g_swapchain_views;
+
 // Per frame data
-std::array<VkSemaphore, FRAMES_IN_FLIGHT> g_acquire_semaphores;
-std::array<VkSemaphore, FRAMES_IN_FLIGHT> g_present_semaphores;
-std::array<VkFence, FRAMES_IN_FLIGHT> g_fences;
-std::array<VkCommandPool, FRAMES_IN_FLIGHT> g_command_pool;
-std::array<VkCommandBuffer, FRAMES_IN_FLIGHT> g_command_buffers;
+std::vector<VkSemaphore> g_semaphores;
+std::array<Frame, SWAPCHAIN_SIZE> g_frame_data{};
 
 VkBuffer g_triangle_buffer;
 
@@ -200,6 +209,36 @@ void make_vertex_buffer()
     vkUnmapMemory(g_device, buff_mem);
 }
 
+void init_per_frame(int index)
+{
+    VkFenceCreateInfo info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    if (vkCreateFence(g_device, &info, nullptr, &g_frame_data[index].fence) == VK_SUCCESS)
+        std::cout << "Fence made" << std::endl;
+    else
+        std::cout << "Fence failed" << std::endl;
+
+    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    pool_info.queueFamilyIndex = static_cast<uint32_t>(QUEUE_INDEX);
+
+    if (vkCreateCommandPool(g_device, &pool_info, nullptr, &g_frame_data[index].pool) == VK_SUCCESS)
+        std::cout << "pool made" << std::endl;
+    else
+        std::cout << "pool failed" << std::endl;
+
+    VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    buf_info.commandPool = g_frame_data[index].pool;
+    buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    buf_info.commandBufferCount = 1;
+
+    if (vkAllocateCommandBuffers(g_device, &buf_info, &g_frame_data[index].buffer) == VK_SUCCESS)
+        std::cout << "buffer made" << std::endl;
+    else
+        std::cout << "buffer failed" << std::endl;
+}
+
 void make_swapchain()
 {
     VkSurfaceCapabilitiesKHR surface_properties;
@@ -233,6 +272,30 @@ void make_swapchain()
         std::cout << "Swapchain made" << std::endl;
     else
         std::cout << "Swapchain failed" << std::endl;
+
+    uint32_t img_count;
+    vkGetSwapchainImagesKHR(g_device, g_swapchain, &img_count, nullptr);
+    g_swapchain_images.resize(img_count);
+    g_swapchain_views.resize(img_count);
+    vkGetSwapchainImagesKHR(g_device, g_swapchain, &img_count, g_swapchain_images.data());
+
+    for (int i = 0; i < img_count; ++i)
+        init_per_frame(i);
+
+    for (auto i = 0; i < img_count; ++i) {
+        VkImageViewCreateInfo view_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        view_info.flags = 0;
+        view_info.image = g_swapchain_images[i];
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        view_info.format = FORMAT;
+        view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        view_info.subresourceRange.baseMipLevel = 0;
+        view_info.subresourceRange.levelCount = 1;
+        view_info.subresourceRange.baseArrayLayer = 0;
+        view_info.subresourceRange.layerCount = 1;
+
+        vkCreateImageView(g_device, &view_info, nullptr, &g_swapchain_views[i]);
+    }
 }
 
 void make_pipeline()
@@ -347,63 +410,176 @@ void make_pipeline()
     //delete shader modules
 }
 
-void init_per_frame(int index)
+void transition_image_layout(VkCommandBuffer cmd,
+                             VkImage img,
+                             VkImageLayout oldLayout,
+                             VkImageLayout newLayout,
+                             VkAccessFlags2 srcAccessMask,
+                             VkAccessFlags2 dstAccessMask,
+                             VkPipelineStageFlags2 srcStage,
+                             VkPipelineStageFlags2 dstStage)
 {
-    VkFenceCreateInfo info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    VkImageMemoryBarrier2 image_barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+    image_barrier.srcStageMask = srcStage;
+    image_barrier.dstStageMask = dstStage;
+    image_barrier.srcAccessMask = srcAccessMask;
+    image_barrier.dstAccessMask = dstAccessMask;
+    image_barrier.oldLayout = oldLayout;
+    image_barrier.newLayout = newLayout;
+    image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    image_barrier.image = img;
+    image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_barrier.subresourceRange.baseMipLevel = 0;
+    image_barrier.subresourceRange.levelCount = 1;
+    image_barrier.subresourceRange.baseArrayLayer = 0;
+    image_barrier.subresourceRange.layerCount = 1;
 
-    if (vkCreateFence(g_device, &info, nullptr, &g_fences[index]) == VK_SUCCESS)
-        std::cout << "Fence made" << std::endl;
-    else
-        std::cout << "Fence failed" << std::endl;
+    VkDependencyInfo dep_info{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    dep_info.dependencyFlags = 0;
+    dep_info.imageMemoryBarrierCount = 1;
+    dep_info.pImageMemoryBarriers = &image_barrier;
 
-    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    pool_info.queueFamilyIndex = static_cast<uint32_t>(QUEUE_INDEX);
-
-    if (vkCreateCommandPool(g_device, &pool_info, nullptr, &g_command_pool[index]) == VK_SUCCESS)
-        std::cout << "pool made" << std::endl;
-    else
-        std::cout << "pool failed" << std::endl;
-
-    VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    buf_info.commandPool = g_command_pool[index];
-    buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    buf_info.commandBufferCount = 1;
-
-    if (vkAllocateCommandBuffers(g_device, &buf_info, &g_command_buffers[index]) == VK_SUCCESS)
-        std::cout << "buffer made" << std::endl;
-    else
-        std::cout << "buffer failed" << std::endl;
+    vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void render_triangle(uint32_t swapchain_index) {}
+void render_triangle(uint32_t img)
+{
+    auto cmd = g_frame_data[img].buffer;
+
+    VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(cmd, &begin_info);
+
+    transition_image_layout(cmd,
+                            g_swapchain_images[img],
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                            0,
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+    VkClearValue clear_value{};
+    clear_value.color = {{0.0, 0.0, 0.0, 1.0}};
+
+    VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    color_attachment.imageView = g_swapchain_views[img];
+    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.clearValue = clear_value;
+
+    VkRenderingInfo rendering_info{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    rendering_info.renderArea.offset = {0, 0};
+    rendering_info.renderArea.extent.width = WIDTH;
+    rendering_info.renderArea.extent.height = HEIGHT;
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 1;
+    rendering_info.pColorAttachments = &color_attachment;
+
+    vkCmdBeginRendering(cmd, &rendering_info);
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipeline);
+
+    VkViewport vp{};
+    vp.width = static_cast<float>(WIDTH);
+    vp.height = static_cast<float>(HEIGHT);
+    vp.minDepth = 0.0f;
+    vp.maxDepth = 1.0f;
+
+    vkCmdSetViewport(cmd, 0, 1, &vp);
+
+    VkRect2D scissor{};
+    scissor.extent.width = WIDTH;
+    scissor.extent.height = HEIGHT;
+
+    vkCmdSetScissor(cmd, 0, 1, &scissor);
+    vkCmdSetCullMode(cmd, VK_CULL_MODE_NONE);
+
+    VkDeviceSize offset{0};
+    vkCmdBindVertexBuffers(cmd, 0, 1, &g_triangle_buffer, &offset);
+
+    vkCmdDraw(cmd, vertices.size(), 1, 0, 0);
+
+    vkCmdEndRendering(cmd);
+
+    transition_image_layout(cmd,
+                            g_swapchain_images[img],
+                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            0,
+                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                            VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
+
+    vkEndCommandBuffer(cmd);
+
+    if (g_frame_data[img].releaseSemaphore == VK_NULL_HANDLE) {
+        VkSemaphoreCreateInfo sem_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        vkCreateSemaphore(g_device, &sem_info, nullptr, &g_frame_data[img].releaseSemaphore);
+    }
+
+    VkPipelineStageFlags wait_stage{VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT};
+
+    VkSubmitInfo sub_info{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    sub_info.waitSemaphoreCount = 1;
+    sub_info.pWaitSemaphores = &g_frame_data[img].acquireSemaphore;
+    sub_info.pWaitDstStageMask = &wait_stage;
+    sub_info.commandBufferCount = 1;
+    sub_info.pCommandBuffers = &cmd;
+    sub_info.signalSemaphoreCount = 1;
+    sub_info.pSignalSemaphores = &g_frame_data[img].releaseSemaphore;
+
+    vkQueueSubmit(g_queue, 1, &sub_info, g_frame_data[img].fence);
+}
 
 VkResult present_image(uint32_t index)
 {
-    return VK_SUCCESS;
+    VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
+    present.waitSemaphoreCount = 1;
+    present.pWaitSemaphores = &g_frame_data[index].releaseSemaphore;
+    present.swapchainCount = 1;
+    present.pSwapchains = &g_swapchain;
+    present.pImageIndices = &index;
+
+    return vkQueuePresentKHR(g_queue, &present);
 }
 
 VkResult acquire_swapchain_image(uint32_t *img)
 {
-    static uint32_t current_frame = 0;
+    VkSemaphore semaphore;
 
-    auto res = vkAcquireNextImageKHR(
-        g_device, g_swapchain, UINT64_MAX, g_acquire_semaphores[current_frame], VK_NULL_HANDLE, img);
+    if (g_semaphores.empty()) {
+        VkSemaphoreCreateInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        vkCreateSemaphore(g_device, &info, nullptr, &semaphore);
+    } else {
+        semaphore = g_semaphores.back();
+        g_semaphores.pop_back();
+    }
 
-    if (res != VK_SUCCESS)
+    auto res
+        = vkAcquireNextImageKHR(g_device, g_swapchain, UINT64_MAX, semaphore, VK_NULL_HANDLE, img);
+
+    if (res != VK_SUCCESS) {
+        g_semaphores.push_back(semaphore);
         return res;
-
-    if (g_fences[*img] != VK_NULL_HANDLE) {
-        vkWaitForFences(g_device, 1, &g_fences[*img], true, UINT64_MAX);
-        vkResetFences(g_device, 1, &g_fences[*img]);
     }
 
-    if (g_command_pool[*img] != VK_NULL_HANDLE) {
-        vkResetCommandPool(g_device, g_command_pool[*img], 0);
+    if (g_frame_data[*img].fence != VK_NULL_HANDLE) {
+        vkWaitForFences(g_device, 1, &g_frame_data[*img].fence, true, UINT64_MAX);
+        vkResetFences(g_device, 1, &g_frame_data[*img].fence);
     }
 
-    current_frame = (current_frame + 1) % FRAMES_IN_FLIGHT;
+    if (g_frame_data[*img].pool != VK_NULL_HANDLE) {
+        vkResetCommandPool(g_device, g_frame_data[*img].pool, 0);
+    }
+
+    auto used_semaphore = g_frame_data[*img].acquireSemaphore;
+    if (used_semaphore != VK_NULL_HANDLE)
+        g_semaphores.push_back(used_semaphore);
+    g_frame_data[*img].acquireSemaphore = semaphore;
 
     return res;
 }
@@ -433,9 +609,6 @@ int main()
     make_swapchain();
     make_pipeline();
 
-    for (int i = 0; i < FRAMES_IN_FLIGHT; ++i)
-        init_per_frame(i);
-
     glfwMakeContextCurrent(w);
 
     glfwShowWindow(w);
@@ -450,7 +623,7 @@ int main()
         }
 
         render_triangle(frame);
-        r = present_image(frame);
+        present_image(frame);
 
         glfwPollEvents();
     }
