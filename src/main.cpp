@@ -1,13 +1,14 @@
-#include <cstring>
-#include <vulkan/vulkan_core.h>
 #define GLFW_INCLUDE_VULKAN
+#include "mesh_loader.h"
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <array>
+#include <cstring>
 #include <fstream>
 #include <glm/glm.hpp>
 #include <iostream>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 constexpr uint32_t QUEUE_INDEX = 0;
 constexpr uint32_t WIDTH = 800;
@@ -40,8 +41,6 @@ std::vector<VkImageView> g_swapchain_views;
 std::vector<VkSemaphore> g_semaphores;
 std::array<Frame, SWAPCHAIN_SIZE> g_frame_data{};
 
-VkBuffer g_triangle_buffer;
-
 struct Vertex
 {
     glm::vec2 position;
@@ -49,11 +48,11 @@ struct Vertex
 };
 
 // Triangle buffer
-const std::vector<Vertex> vertices = {
-    {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // Vertex 1: Red
-    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},  // Vertex 2: Green
-    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}  // Vertex 3: Blue
-};
+// const std::vector<Vertex> vertices = {
+//     {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}}, // Vertex 1: Red
+//     {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},  // Vertex 2: Green
+//     {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}  // Vertex 3: Blue
+// };
 
 uint32_t find_memory_type(
     VkPhysicalDevice phy_device, uint32_t filter_type, VkMemoryPropertyFlags props)
@@ -171,23 +170,23 @@ void make_device()
     vkGetDeviceQueue(g_device, QUEUE_INDEX, 0, &g_queue);
 }
 
-void make_vertex_buffer()
+VkBuffer make_vertex_buffer(VkDeviceSize buffer_size, void *buffer_data, VkBufferUsageFlags flags)
 {
-    VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+    VkBuffer buffer;
 
     VkBufferCreateInfo vertex_b_info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     vertex_b_info.size = buffer_size;
-    vertex_b_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    vertex_b_info.usage = flags;
     vertex_b_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(g_device, &vertex_b_info, nullptr, &g_triangle_buffer) == VK_SUCCESS)
+    if (vkCreateBuffer(g_device, &vertex_b_info, nullptr, &buffer) == VK_SUCCESS)
         std::cout << "Made triangle buffer" << std::endl;
     else
         std::cout << "Triangle buffer failed" << std::endl;
 
     VkMemoryRequirements mem_req;
     VkDeviceMemory buff_mem;
-    vkGetBufferMemoryRequirements(g_device, g_triangle_buffer, &mem_req);
+    vkGetBufferMemoryRequirements(g_device, buffer, &mem_req);
 
     //Assume memory index 0
     VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
@@ -201,12 +200,14 @@ void make_vertex_buffer()
     else
         std::cout << "Triangle memory failed" << std::endl;
 
-    vkBindBufferMemory(g_device, g_triangle_buffer, buff_mem, 0);
+    vkBindBufferMemory(g_device, buffer, buff_mem, 0);
 
     void *data;
     vkMapMemory(g_device, buff_mem, 0, buffer_size, 0, &data);
-    memcpy(data, vertices.data(), (size_t) buffer_size);
+    memcpy(data, buffer_data, (size_t) buffer_size);
     vkUnmapMemory(g_device, buff_mem);
+
+    return buffer;
 }
 
 void init_per_frame(int index)
@@ -443,7 +444,7 @@ void transition_image_layout(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void render_triangle(uint32_t img)
+void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_t index_count)
 {
     auto cmd = g_frame_data[img].buffer;
 
@@ -499,9 +500,11 @@ void render_triangle(uint32_t img)
     vkCmdSetCullMode(cmd, VK_CULL_MODE_NONE);
 
     VkDeviceSize offset{0};
-    vkCmdBindVertexBuffers(cmd, 0, 1, &g_triangle_buffer, &offset);
+    vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);
+    vkCmdBindIndexBuffer(cmd, index_buffer, offset, VK_INDEX_TYPE_UINT16);
 
-    vkCmdDraw(cmd, vertices.size(), 1, 0, 0);
+    //vkCmdDraw(cmd, vertices.size(), 1, 0, 0);
+    vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 
     vkCmdEndRendering(cmd);
 
@@ -592,6 +595,8 @@ int main()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_DECORATED, GL_TRUE);
 
+    auto mesh = MeshLoader::load_mesh(ROOT "assets/earth.glb");
+
     auto *w = glfwCreateWindow(WIDTH, HEIGHT, "Orbital", NULL, NULL);
 
     if (!w)
@@ -599,7 +604,15 @@ int main()
 
     make_instance();
     make_device();
-    make_vertex_buffer();
+    // auto buffer = make_vertex_buffer(sizeof(vertices[0]) * vertices.size(),
+    //                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
+    auto vbuffer = make_vertex_buffer(sizeof(vertex) * mesh.vertices.size(),
+                                      mesh.vertices.data(),
+                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    auto ibuffer = make_vertex_buffer(sizeof(uint16_t) * mesh.indices.size(),
+                                      mesh.indices.data(),
+                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     if (auto res = glfwCreateWindowSurface(g_instance, w, nullptr, &g_surface); res == VK_SUCCESS)
         std::cout << "Surface creation good" << std::endl;
@@ -622,7 +635,7 @@ int main()
             continue;
         }
 
-        render_triangle(frame);
+        render(frame, vbuffer, ibuffer, mesh.indices.size());
         present_image(frame);
 
         glfwPollEvents();
