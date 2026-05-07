@@ -6,13 +6,14 @@
 #include <cstring>
 #include <fstream>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
 constexpr uint32_t QUEUE_INDEX = 0;
 constexpr uint32_t WIDTH = 800;
-constexpr uint32_t HEIGHT = 600;
+constexpr uint32_t HEIGHT = 800;
 constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
 constexpr uint32_t SWAPCHAIN_SIZE = 3;
 constexpr uint32_t FRAMES_IN_FLIGHT = 2;
@@ -26,6 +27,13 @@ struct Frame
     VkCommandBuffer buffer;
 };
 
+struct UniformConstants
+{
+    glm::mat4 mvp;
+    glm::vec3 color;
+    float _padding;
+};
+
 VkInstance g_instance;
 VkPhysicalDevice g_physical_device;
 VkDevice g_device;
@@ -33,6 +41,17 @@ VkQueue g_queue;
 VkSurfaceKHR g_surface;
 VkSwapchainKHR g_swapchain;
 VkPipeline g_pipeline;
+VkPipelineLayout g_pipeline_layout;
+
+glm::mat4 g_model = glm::mat4(1.0f);
+glm::mat4 g_view = glm::lookAt(glm::vec3(4, 4, -4), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+glm::mat4 g_projection = glm::perspective(glm::radians(45.0f),
+                                          (float) WIDTH / (float) HEIGHT,
+                                          0.1f,
+                                          100.0f);
+glm::mat4 g_mvp = g_projection * g_view * g_model;
+
+UniformConstants g_constants = {g_mvp, glm::vec3(1.0f)};
 
 std::vector<VkImage> g_swapchain_images;
 std::vector<VkImageView> g_swapchain_views;
@@ -40,12 +59,6 @@ std::vector<VkImageView> g_swapchain_views;
 // Per frame data
 std::vector<VkSemaphore> g_semaphores;
 std::array<Frame, SWAPCHAIN_SIZE> g_frame_data{};
-
-struct Vertex
-{
-    glm::vec2 position;
-    glm::vec3 color;
-};
 
 // Triangle buffer
 // const std::vector<Vertex> vertices = {
@@ -301,25 +314,32 @@ void make_swapchain()
 
 void make_pipeline()
 {
-    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    VkPipelineLayout layout;
+    VkPushConstantRange range{};
+    range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    range.offset = 0;
+    range.size = sizeof(UniformConstants);
 
-    vkCreatePipelineLayout(g_device, &layout_info, nullptr, &layout);
+    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+
+    layout_info.pushConstantRangeCount = 1;
+    layout_info.pPushConstantRanges = &range;
+
+    vkCreatePipelineLayout(g_device, &layout_info, nullptr, &g_pipeline_layout);
 
     VkVertexInputBindingDescription binding_desc{};
     binding_desc.binding = 0;
-    binding_desc.stride = sizeof(Vertex);
+    binding_desc.stride = sizeof(vertex);
     binding_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
     std::array<VkVertexInputAttributeDescription, 2> attr_description = {{
         {.location = 0,
          .binding = 0,
-         .format = VK_FORMAT_R32G32_SFLOAT,
-         .offset = offsetof(Vertex, position)},
+         .format = VK_FORMAT_R32G32B32_SFLOAT,
+         .offset = offsetof(vertex, position)},
         {.location = 1,
          .binding = 0,
-         .format = VK_FORMAT_R32G32B32_SFLOAT,
-         .offset = offsetof(Vertex, color)},
+         .format = VK_FORMAT_R32G32_SFLOAT,
+         .offset = offsetof(vertex, uv)},
     }};
 
     VkPipelineVertexInputStateCreateInfo vertex_state_info{
@@ -398,7 +418,7 @@ void make_pipeline()
     info.pDepthStencilState = &depth_stencil_state;
     info.pColorBlendState = &blend_state_info;
     info.pDynamicState = &dynamic_state_info;
-    info.layout = layout;
+    info.layout = g_pipeline_layout;
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
 
@@ -502,6 +522,15 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     VkDeviceSize offset{0};
     vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);
     vkCmdBindIndexBuffer(cmd, index_buffer, offset, VK_INDEX_TYPE_UINT16);
+
+    float color[3] = {1, 1, 1};
+
+    vkCmdPushConstants(cmd,
+                       g_pipeline_layout,
+                       VK_SHADER_STAGE_VERTEX_BIT,
+                       0,
+                       sizeof(UniformConstants),
+                       &g_constants);
 
     //vkCmdDraw(cmd, vertices.size(), 1, 0, 0);
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
