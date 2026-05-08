@@ -9,6 +9,11 @@ struct vec3
     float x, y, z;
 };
 
+struct vec4
+{
+    float x, y, z, w;
+};
+
 struct vec2
 {
     float u, v;
@@ -17,6 +22,7 @@ struct vec2
 struct vertex
 {
     vec3 position;
+    vec3 normal;
     vec2 uv;
 };
 

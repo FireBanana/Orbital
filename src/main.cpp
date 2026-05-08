@@ -30,7 +30,8 @@ struct Frame
 struct UniformConstants
 {
     glm::mat4 mvp;
-    glm::vec3 color;
+    glm::mat4 model;
+    glm::vec3 normal;
     float _padding;
 };
 
@@ -44,14 +45,14 @@ VkPipeline g_pipeline;
 VkPipelineLayout g_pipeline_layout;
 
 glm::mat4 g_model = glm::mat4(1.0f);
-glm::mat4 g_view = glm::lookAt(glm::vec3(4, 4, -4), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+glm::mat4 g_view = glm::lookAt(glm::vec3(3, 3, -4), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 glm::mat4 g_projection = glm::perspective(glm::radians(45.0f),
                                           (float) WIDTH / (float) HEIGHT,
                                           0.1f,
                                           100.0f);
 glm::mat4 g_mvp = g_projection * g_view * g_model;
 
-UniformConstants g_constants = {g_mvp, glm::vec3(1.0f)};
+UniformConstants g_constants = {g_mvp, glm::mat3(glm::transpose(g_model)), glm::vec3(1.0f)};
 
 std::vector<VkImage> g_swapchain_images;
 std::vector<VkImageView> g_swapchain_views;
@@ -331,12 +332,16 @@ void make_pipeline()
     binding_desc.stride = sizeof(vertex);
     binding_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    std::array<VkVertexInputAttributeDescription, 2> attr_description = {{
+    std::array<VkVertexInputAttributeDescription, 3> attr_description = {{
         {.location = 0,
          .binding = 0,
          .format = VK_FORMAT_R32G32B32_SFLOAT,
          .offset = offsetof(vertex, position)},
         {.location = 1,
+         .binding = 0,
+         .format = VK_FORMAT_R32G32B32_SFLOAT,
+         .offset = offsetof(vertex, normal)},
+        {.location = 2,
          .binding = 0,
          .format = VK_FORMAT_R32G32_SFLOAT,
          .offset = offsetof(vertex, uv)},
@@ -522,8 +527,6 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     VkDeviceSize offset{0};
     vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);
     vkCmdBindIndexBuffer(cmd, index_buffer, offset, VK_INDEX_TYPE_UINT16);
-
-    float color[3] = {1, 1, 1};
 
     vkCmdPushConstants(cmd,
                        g_pipeline_layout,

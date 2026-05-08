@@ -1,6 +1,7 @@
 struct UniformConstants
 {
     float4x4 mvp;
+    float4x4 model;
     float3 color;
     float _padding;
 };
@@ -8,16 +9,15 @@ struct UniformConstants
 struct VSInput
 {
     float3 Position : POSITION0;
-    float2 Uv;
+    float3 Normal : NORMAL;
+    float2 Uv : TEXCOORD0;
 };
 
 struct VSOutput
 {
     float4 Position : SV_POSITION;
-    float3 Color : TEXCOORD0;
+    float3 Normal : NORMAL;
 };
-
-constexpr float3 g_light_dir = {-0.8, -1.0, 0.0};
 
 [[vk::push_constant]]
 UniformConstants state;
@@ -27,6 +27,6 @@ VSOutput main(VSInput input)
 {        
     VSOutput output;
     output.Position = mul(state.mvp, float4(input.Position, 1.0));
-    output.Color = state.color;
+    output.Normal = mul(state.model, input.Normal);
     return output;
 }

@@ -32,6 +32,7 @@ Mesh MeshLoader::load_mesh(const std::string &path)
     for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
         auto position_it = it->findAttribute("POSITION");
         auto texcoord_it = it->findAttribute("TEXCOORD_0");
+        auto normal_it = it->findAttribute("NORMAL");
 
         auto &primitive = *it;
         auto &position_accessor = asset->accessors[position_it->accessorIndex];
@@ -53,6 +54,13 @@ Mesh MeshLoader::load_mesh(const std::string &path)
                                                                       vertices[idx].uv = {uv.x(),
                                                                                           uv.y()};
                                                                   });
+
+        auto &normal_accessor = asset->accessors[normal_it->accessorIndex];
+
+        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+            asset.get(), normal_accessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+                vertices[idx].normal = {pos.x(), pos.y(), pos.z()};
+            });
 
         auto &index_accessor = asset->accessors[it->indicesAccessor.value()];
         indices.resize(index_accessor.count);
