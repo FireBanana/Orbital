@@ -386,7 +386,7 @@ void make_pipeline()
 
     VkPipelineDepthStencilStateCreateInfo depth_stencil_state{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_ALWAYS;
+    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
     VkPipelineMultisampleStateCreateInfo multisample_state{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
@@ -522,7 +522,7 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     scissor.extent.height = HEIGHT;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
-    vkCmdSetCullMode(cmd, VK_CULL_MODE_NONE);
+    vkCmdSetCullMode(cmd, VK_CULL_MODE_BACK_BIT);
 
     VkDeviceSize offset{0};
     vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);

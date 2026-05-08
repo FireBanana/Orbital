@@ -27,6 +27,6 @@ VSOutput main(VSInput input)
 {        
     VSOutput output;
     output.Position = mul(state.mvp, float4(input.Position, 1.0));
-    output.Normal = mul(state.model, input.Normal);
+    output.Normal = input.Normal;
     return output;
 }
