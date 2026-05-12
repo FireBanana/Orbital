@@ -1,8 +1,18 @@
 #include "graphics.h"
 #include "mesh_loader.h"
+#include <array>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <vector>
+
+constexpr uint32_t QUEUE_INDEX = 0;
+constexpr uint32_t WIDTH = 800;
+constexpr uint32_t HEIGHT = 800;
+constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
+constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
+constexpr uint32_t SWAPCHAIN_SIZE = 3;
+constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 VkInstance g_instance;
 VkPhysicalDevice g_physical_device;
@@ -25,6 +35,8 @@ UniformConstants g_constants = {g_mvp, glm::mat3(glm::transpose(g_model)), glm::
 
 std::vector<VkImage> g_swapchain_images;
 std::vector<VkImageView> g_swapchain_views;
+VkImage g_depth;
+VkImageView g_depth_view;
 
 // Per frame data
 std::vector<VkSemaphore> g_semaphores;
@@ -217,6 +229,48 @@ void init_per_frame(int index)
         std::cout << "buffer failed" << std::endl;
 }
 
+void make_depth_image()
+{
+    VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    info.format = DEPTH_FORMAT;
+    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    info.extent.width = WIDTH;
+    info.extent.height = HEIGHT;
+    info.extent.depth = 1;
+    info.imageType = VK_IMAGE_TYPE_2D;
+    info.mipLevels = 1;
+    info.arrayLayers = 1;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+
+    vkCreateImage(g_device, &info, nullptr, &g_depth);
+
+    VkMemoryRequirements mem_reqs{};
+    vkGetImageMemoryRequirements(g_device, g_depth, &mem_reqs);
+
+    VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    alloc_info.allocationSize = mem_reqs.size;
+    alloc_info.memoryTypeIndex = find_memory_type(g_physical_device,
+                                                  mem_reqs.memoryTypeBits,
+                                                  VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    VkDeviceMemory img_mem;
+    vkAllocateMemory(g_device, &alloc_info, nullptr, &img_mem);
+    vkBindImageMemory(g_device, g_depth, img_mem, 0);
+
+    VkImageViewCreateInfo create_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    create_info.image = g_depth;
+    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    create_info.format = DEPTH_FORMAT;
+    create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    create_info.subresourceRange.baseMipLevel = 0;
+    create_info.subresourceRange.levelCount = 1;
+    create_info.subresourceRange.baseArrayLayer = 0;
+    create_info.subresourceRange.layerCount = 1;
+
+    vkCreateImageView(g_device, &create_info, nullptr, &g_depth_view);
+}
+
 void make_swapchain()
 {
     VkSurfaceCapabilitiesKHR surface_properties;
@@ -375,6 +429,7 @@ void make_pipeline()
     VkPipelineRenderingCreateInfo rendering_info{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachmentFormats = &FORMAT;
+    rendering_info.depthAttachmentFormat = DEPTH_FORMAT;
 
     VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
     info.pNext = &rendering_info;
@@ -405,6 +460,7 @@ void transition_image_layout(VkCommandBuffer cmd,
                              VkImage img,
                              VkImageLayout oldLayout,
                              VkImageLayout newLayout,
+                             VkImageAspectFlags aspectFlags,
                              VkAccessFlags2 srcAccessMask,
                              VkAccessFlags2 dstAccessMask,
                              VkPipelineStageFlags2 srcStage,
@@ -420,7 +476,7 @@ void transition_image_layout(VkCommandBuffer cmd,
     image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     image_barrier.image = img;
-    image_barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    image_barrier.subresourceRange.aspectMask = aspectFlags;
     image_barrier.subresourceRange.baseMipLevel = 0;
     image_barrier.subresourceRange.levelCount = 1;
     image_barrier.subresourceRange.baseArrayLayer = 0;
@@ -449,13 +505,26 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
                             g_swapchain_images[img],
                             VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                            VK_IMAGE_ASPECT_COLOR_BIT,
                             0,
                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                             VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
+    transition_image_layout(cmd,
+                            g_depth,
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
+                            VK_IMAGE_ASPECT_DEPTH_BIT,
+                            0,
+                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
+                                | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
+
     VkClearValue clear_value{};
     clear_value.color = {{0.0, 0.0, 0.0, 1.0}};
+    clear_value.depthStencil = {0, 0};
 
     VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     color_attachment.imageView = g_swapchain_views[img];
@@ -464,6 +533,13 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     color_attachment.clearValue = clear_value;
 
+    VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    depth_attachment.imageView = g_depth_view;
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    depth_attachment.clearValue = clear_value;
+
     VkRenderingInfo rendering_info{VK_STRUCTURE_TYPE_RENDERING_INFO};
     rendering_info.renderArea.offset = {0, 0};
     rendering_info.renderArea.extent.width = WIDTH;
@@ -471,6 +547,7 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     rendering_info.layerCount = 1;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments = &color_attachment;
+    rendering_info.pDepthAttachment = &depth_attachment;
 
     vkCmdBeginRendering(cmd, &rendering_info);
 
@@ -520,6 +597,7 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
                             g_swapchain_images[img],
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            VK_IMAGE_ASPECT_COLOR_BIT,
                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                             0,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
@@ -599,6 +677,8 @@ VkResult acquire_swapchain_image(uint32_t *img)
 
 int g_main()
 {
+    //glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+
     if (!glfwInit())
         std::cout << "Issues!";
 
@@ -616,11 +696,11 @@ int g_main()
     make_instance();
     make_device();
 
-    auto vbuffer = make_vertex_buffer(sizeof(vertex) * earth.vertices.size(),
-                                      earth.vertices.data(),
+    auto vbuffer = make_vertex_buffer(sizeof(vertex) * monkey.vertices.size(),
+                                      monkey.vertices.data(),
                                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    auto ibuffer = make_vertex_buffer(sizeof(uint16_t) * earth.indices.size(),
-                                      earth.indices.data(),
+    auto ibuffer = make_vertex_buffer(sizeof(uint16_t) * monkey.indices.size(),
+                                      monkey.indices.data(),
                                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
 
     if (auto res = glfwCreateWindowSurface(g_instance, w, nullptr, &g_surface); res == VK_SUCCESS)
@@ -629,6 +709,7 @@ int g_main()
         std::cout << "Surface creation failed " << res << std::endl;
 
     make_swapchain();
+    make_depth_image();
     make_pipeline();
 
     glfwMakeContextCurrent(w);
@@ -644,9 +725,12 @@ int g_main()
             continue;
         }
 
-        render(frame, vbuffer, ibuffer, earth.indices.size());
+        render(frame, vbuffer, ibuffer, monkey.indices.size());
         present_image(frame);
 
+        glfwSwapBuffers(w);
         glfwPollEvents();
     }
+
+    return 0;
 }

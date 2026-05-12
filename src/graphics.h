@@ -4,19 +4,10 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
-#include <array>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
-#include <vector>
 #include <vulkan/vulkan_core.h>
-
-constexpr uint32_t QUEUE_INDEX = 0;
-constexpr uint32_t WIDTH = 800;
-constexpr uint32_t HEIGHT = 800;
-constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
-constexpr uint32_t SWAPCHAIN_SIZE = 3;
-constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 struct Frame
 {
@@ -49,6 +40,8 @@ VkBuffer make_vertex_buffer(VkDeviceSize buffer_size, void *buffer_data, VkBuffe
 
 void init_per_frame(int index);
 
+void make_depth_image();
+
 void make_swapchain();
 
 void make_pipeline();
@@ -57,6 +50,7 @@ void transition_image_layout(VkCommandBuffer cmd,
                              VkImage img,
                              VkImageLayout oldLayout,
                              VkImageLayout newLayout,
+                             VkImageAspectFlags flags,
                              VkAccessFlags2 srcAccessMask,
                              VkAccessFlags2 dstAccessMask,
                              VkPipelineStageFlags2 srcStage,
