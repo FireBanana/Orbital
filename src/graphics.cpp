@@ -404,7 +404,9 @@ void make_pipeline()
 
     VkPipelineDepthStencilStateCreateInfo depth_stencil_state{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+    depth_stencil_state.depthTestEnable = VK_TRUE;
+    depth_stencil_state.depthWriteEnable = VK_TRUE;
 
     VkPipelineMultisampleStateCreateInfo multisample_state{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
