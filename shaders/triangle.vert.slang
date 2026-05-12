@@ -2,8 +2,8 @@ struct UniformConstants
 {
     float4x4 mvp;
     float4x4 model;
-    float3 color;
-    float _padding;
+    float4 camera;
+    uint32_t frame;
 };
 
 struct VSInput

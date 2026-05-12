@@ -7,8 +7,8 @@
 #include <vector>
 
 constexpr uint32_t QUEUE_INDEX = 0;
-constexpr uint32_t WIDTH = 800;
-constexpr uint32_t HEIGHT = 800;
+constexpr uint32_t WIDTH = 1920;
+constexpr uint32_t HEIGHT = 1080;
 constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
 constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
 constexpr uint32_t SWAPCHAIN_SIZE = 3;
@@ -24,14 +24,14 @@ VkPipeline g_pipeline;
 VkPipelineLayout g_pipeline_layout;
 
 glm::mat4 g_model = glm::mat4(1.0f);
-glm::mat4 g_view = glm::lookAt(glm::vec3(3, 3, -4), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+glm::mat4 g_view = glm::lookAt(glm::vec3(0, 0, -5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 glm::mat4 g_projection = glm::perspective(glm::radians(45.0f),
                                           (float) WIDTH / (float) HEIGHT,
                                           0.1f,
                                           100.0f);
 glm::mat4 g_mvp = g_projection * g_view * g_model;
 
-UniformConstants g_constants = {g_mvp, glm::mat3(glm::transpose(g_model)), glm::vec3(1.0f)};
+UniformConstants g_constants = {g_mvp, glm::mat3(glm::transpose(g_model))};
 
 std::vector<VkImage> g_swapchain_images;
 std::vector<VkImageView> g_swapchain_views;
@@ -333,7 +333,7 @@ void make_swapchain()
 void make_pipeline()
 {
     VkPushConstantRange range{};
-    range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     range.offset = 0;
     range.size = sizeof(UniformConstants);
 
@@ -494,7 +494,7 @@ void transition_image_layout(VkCommandBuffer cmd,
 
 void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_t index_count)
 {
-    static uint64_t frame = 0;
+    static uint32_t frame = 0;
 
     auto cmd = g_frame_data[img].buffer;
 
@@ -525,7 +525,7 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
                                 | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
 
     VkClearValue clear_value{};
-    clear_value.color = {{0.0, 0.0, 0.0, 1.0}};
+    clear_value.color = {{0, 0, 0}};
     clear_value.depthStencil = {0, 0};
 
     VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
@@ -575,12 +575,15 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     vkCmdBindIndexBuffer(cmd, index_buffer, offset, VK_INDEX_TYPE_UINT16);
 
     // updates go here
-    g_view = glm::lookAt(glm::vec3(glm::sin(frame * 0.01) * 3, 3, glm::cos(frame * 0.01) * 3),
-                         glm::vec3(0, 0, 0),
-                         glm::vec3(0, 1, 0));
+    auto camera_pos = glm::vec3(glm::sin(frame * 0.01) * 3, 3, glm::cos(frame * 0.01) * 3);
+
+    g_view = glm::lookAt(camera_pos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 
     g_mvp = g_projection * g_view * g_model;
-    g_constants = {g_mvp, glm::mat3(glm::transpose(g_model)), glm::vec3(1.0f)};
+    g_constants = {g_mvp,
+                   glm::mat3(glm::transpose(g_model)),
+                   glm::vec4(camera_pos.x, camera_pos.y, camera_pos.z, 0),
+                   frame};
     //
 
     vkCmdPushConstants(cmd,
@@ -679,8 +682,6 @@ VkResult acquire_swapchain_image(uint32_t *img)
 
 int g_main()
 {
-    //glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
-
     if (!glfwInit())
         std::cout << "Issues!";
 

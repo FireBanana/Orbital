@@ -70,3 +70,24 @@ Mesh MeshLoader::load_mesh(const std::string &path)
 
     return {vertices, indices};
 }
+
+void MeshLoader::load_image(const std::string &path)
+{
+    auto file = fastgltf::GltfDataBuffer::FromPath(path);
+    fastgltf::Parser parser{};
+
+    if (!file) {
+        std::cout << "error loading file" << std::endl;
+        return;
+    }
+
+    auto asset = parser.loadGltf(file.get(), path);
+
+    for (auto &i : asset->images) {
+        std::visit(fastgltf::visitor{[](auto &arg) {},
+                                     [&](fastgltf::sources::URI &filepath) {},
+                                     [&](fastgltf::sources::Array &vec) {},
+                                     [&](fastgltf::sources::BufferView &view) {}},
+                   i.data);
+    }
+}

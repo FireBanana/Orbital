@@ -22,8 +22,8 @@ struct UniformConstants
 {
     glm::mat4 mvp;
     glm::mat4 model;
-    glm::vec3 normal;
-    float _padding;
+    glm::vec4 camera;
+    uint32_t frame;
 };
 
 uint32_t find_memory_type(VkPhysicalDevice phy_device,
