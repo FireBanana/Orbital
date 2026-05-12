@@ -36,7 +36,7 @@ float4 main(VSOutput input)
 
     float3 color = max(dot(normalize(g_light_dir), normalize(input.Normal)), float3(0.));
     color /= 3.142;
-    float ambient = 10.;
+    float ambient = 1.5;
 
     return float4(color + ambient * schlick(input.Normal), 1.0);
 }

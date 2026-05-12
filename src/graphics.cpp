@@ -23,12 +23,13 @@ VkSwapchainKHR g_swapchain;
 VkPipeline g_pipeline;
 VkPipelineLayout g_pipeline_layout;
 
+glm::vec3 g_camera_position = glm::vec3(0, 0, -5);
 glm::mat4 g_model = glm::mat4(1.0f);
-glm::mat4 g_view = glm::lookAt(glm::vec3(0, 0, -5), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-glm::mat4 g_projection = glm::perspective(glm::radians(45.0f),
-                                          (float) WIDTH / (float) HEIGHT,
-                                          0.1f,
-                                          100.0f);
+glm::mat4 g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+glm::mat4 g_projection = glm::perspectiveRH_ZO(glm::radians(60.0f),
+                                               (float) WIDTH / (float) HEIGHT,
+                                               0.1f,
+                                               100.0f);
 glm::mat4 g_mvp = g_projection * g_view * g_model;
 
 UniformConstants g_constants = {g_mvp, glm::mat3(glm::transpose(g_model))};
@@ -575,14 +576,11 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     vkCmdBindIndexBuffer(cmd, index_buffer, offset, VK_INDEX_TYPE_UINT16);
 
     // updates go here
-    auto camera_pos = glm::vec3(glm::sin(frame * 0.01) * 3, 3, glm::cos(frame * 0.01) * 3);
-
-    g_view = glm::lookAt(camera_pos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-
+    g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     g_mvp = g_projection * g_view * g_model;
     g_constants = {g_mvp,
                    glm::mat3(glm::transpose(g_model)),
-                   glm::vec4(camera_pos.x, camera_pos.y, camera_pos.z, 0),
+                   glm::vec4(g_camera_position.x, g_camera_position.y, g_camera_position.z, 0),
                    frame};
     //
 
@@ -718,6 +716,31 @@ int g_main()
     glfwMakeContextCurrent(w);
 
     glfwShowWindow(w);
+
+    bool is_clicked = false;
+
+    glfwSetWindowUserPointer(w, &is_clicked);
+
+    glfwSetMouseButtonCallback(w, [](GLFWwindow *window, int button, int action, int mods) {
+        auto *is_c = static_cast<bool *>(glfwGetWindowUserPointer(window));
+
+        if (button == GLFW_MOUSE_BUTTON_LEFT)
+            if (action == GLFW_PRESS)
+                *is_c = true;
+            else if (action == GLFW_RELEASE)
+                *is_c = false;
+    });
+
+    glfwSetCursorPosCallback(w, [](GLFWwindow *window, double xpos, double ypos) {
+        auto *is_c = static_cast<bool *>(glfwGetWindowUserPointer(window));
+
+        if (!*is_c)
+            return;
+
+        g_camera_position = glm::vec3(3. * glm::sin(ypos * 0.01) * glm::cos(xpos * 0.01),
+                                      3. * glm::cos(ypos * 0.01),
+                                      3. * glm::sin(ypos * 0.01) * glm::sin(xpos * 0.01));
+    });
 
     while (!glfwWindowShouldClose(w)) {
         uint32_t frame;
