@@ -23,13 +23,13 @@ VkSwapchainKHR g_swapchain;
 VkPipeline g_pipeline;
 VkPipelineLayout g_pipeline_layout;
 
-glm::vec3 g_camera_position = glm::vec3(0, 0, -5);
+glm::vec3 g_camera_position = glm::vec3(0., 0., 3.);
 glm::mat4 g_model = glm::mat4(1.0f);
-glm::mat4 g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-glm::mat4 g_projection = glm::perspective(glm::radians(60.0f),
-                                          (float) WIDTH / (float) HEIGHT,
-                                          0.1f,
-                                          1000.0f);
+glm::mat4 g_view = glm::lookAtRH(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+glm::mat4 g_projection = glm::perspectiveZO(glm::radians(60.0f),
+                                            (float) WIDTH / (float) HEIGHT,
+                                            0.1f,
+                                            1000.0f);
 
 UniformConstants g_constants = {g_model, g_view, g_projection, glm::vec4(1.)};
 
@@ -524,7 +524,7 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     //                         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
 
     VkClearValue clear_color_value{}, depth_clear_value{};
-    clear_color_value.color = {{1, 1, 1}};
+    clear_color_value.color = {{0, 0, 0}};
     depth_clear_value.depthStencil = {1, 0};
 
     VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
@@ -717,29 +717,53 @@ int g_main()
 
     glfwShowWindow(w);
 
-    bool is_clicked = false;
+    struct WindowState
+    {
+        bool new_click;
+        bool is_pressed;
+    } state;
 
-    glfwSetWindowUserPointer(w, &is_clicked);
+    glfwSetWindowUserPointer(w, &state);
 
     glfwSetMouseButtonCallback(w, [](GLFWwindow *window, int button, int action, int mods) {
-        auto *is_c = static_cast<bool *>(glfwGetWindowUserPointer(window));
+        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
 
-        if (button == GLFW_MOUSE_BUTTON_LEFT)
-            if (action == GLFW_PRESS)
-                *is_c = true;
-            else if (action == GLFW_RELEASE)
-                *is_c = false;
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            if (action == GLFW_PRESS) {
+                state->is_pressed = true;
+                state->new_click = true;
+            } else if (action == GLFW_RELEASE) {
+                state->is_pressed = false;
+            }
+        }
     });
 
     glfwSetCursorPosCallback(w, [](GLFWwindow *window, double xpos, double ypos) {
-        auto *is_c = static_cast<bool *>(glfwGetWindowUserPointer(window));
+        static double last_x_position = xpos, last_y_position = ypos;
+        static double x_delta = 0.0;
+        static double y_delta = 0.0;
 
-        if (!*is_c)
+        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
+
+        if (!state->is_pressed)
             return;
 
-        g_camera_position = glm::vec3(3. * glm::sin(ypos * 0.01) * glm::cos(xpos * 0.01),
-                                      3. * glm::cos(ypos * 0.01),
-                                      3. * glm::sin(ypos * 0.01) * glm::sin(xpos * 0.01));
+        if (state->new_click) {
+            last_x_position = xpos;
+            last_y_position = ypos;
+            state->new_click = false;
+        }
+
+        x_delta -= xpos - last_x_position;
+        y_delta += ypos - last_y_position;
+        y_delta = glm::clamp(y_delta, -130.0 + 0.01, 130.0 - 0.01);
+
+        g_camera_position = glm::vec3(3. * (glm::sin(x_delta * 0.01) * glm::cos(y_delta * 0.01)),
+                                      3. * (glm::sin(y_delta * 0.01)),
+                                      3. * (glm::cos(x_delta * 0.01) * glm::cos(y_delta * 0.01)));
+
+        last_x_position = xpos;
+        last_y_position = ypos;
     });
 
     while (!glfwWindowShouldClose(w)) {
