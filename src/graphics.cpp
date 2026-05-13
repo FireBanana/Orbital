@@ -8,7 +8,7 @@
 
 constexpr uint32_t QUEUE_INDEX = 0;
 constexpr uint32_t WIDTH = 1920;
-constexpr uint32_t HEIGHT = 1080;
+constexpr uint32_t HEIGHT = 969;
 constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
 constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
 constexpr uint32_t SWAPCHAIN_SIZE = 3;
@@ -26,13 +26,12 @@ VkPipelineLayout g_pipeline_layout;
 glm::vec3 g_camera_position = glm::vec3(0, 0, -5);
 glm::mat4 g_model = glm::mat4(1.0f);
 glm::mat4 g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-glm::mat4 g_projection = glm::perspectiveRH_ZO(glm::radians(60.0f),
-                                               (float) WIDTH / (float) HEIGHT,
-                                               0.1f,
-                                               100.0f);
-glm::mat4 g_mvp = g_projection * g_view * g_model;
+glm::mat4 g_projection = glm::perspective(glm::radians(60.0f),
+                                          (float) WIDTH / (float) HEIGHT,
+                                          0.1f,
+                                          1000.0f);
 
-UniformConstants g_constants = {g_mvp, glm::mat3(glm::transpose(g_model))};
+UniformConstants g_constants = {g_model, g_view, g_projection, glm::vec4(1.)};
 
 std::vector<VkImage> g_swapchain_images;
 std::vector<VkImageView> g_swapchain_views;
@@ -405,7 +404,7 @@ void make_pipeline()
 
     VkPipelineDepthStencilStateCreateInfo depth_stencil_state{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_GREATER_OR_EQUAL;
+    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     depth_stencil_state.depthTestEnable = VK_TRUE;
     depth_stencil_state.depthWriteEnable = VK_TRUE;
 
@@ -514,34 +513,33 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
                             VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-    transition_image_layout(cmd,
-                            g_depth,
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
-                            VK_IMAGE_ASPECT_DEPTH_BIT,
-                            0,
-                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
-                                | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
+    // transition_image_layout(cmd,
+    //                         g_depth,
+    //                         VK_IMAGE_LAYOUT_UNDEFINED,
+    //                         VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+    //                         VK_IMAGE_ASPECT_DEPTH_BIT,
+    //                         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+    //                         0,
+    //                         VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+    //                         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
 
-    VkClearValue clear_value{};
-    clear_value.color = {{0, 0, 0}};
-    clear_value.depthStencil = {0, 0};
+    VkClearValue clear_color_value{}, depth_clear_value{};
+    clear_color_value.color = {{1, 1, 1}};
+    depth_clear_value.depthStencil = {1, 0};
 
     VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     color_attachment.imageView = g_swapchain_views[img];
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment.clearValue = clear_value;
+    color_attachment.clearValue = clear_color_value;
 
     VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     depth_attachment.imageView = g_depth_view;
-    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    depth_attachment.clearValue = clear_value;
+    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth_attachment.clearValue = depth_clear_value;
 
     VkRenderingInfo rendering_info{VK_STRUCTURE_TYPE_RENDERING_INFO};
     rendering_info.renderArea.offset = {0, 0};
@@ -557,8 +555,10 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipeline);
 
     VkViewport vp{};
+    vp.x = 0;
+    vp.y = static_cast<float>(HEIGHT);
     vp.width = static_cast<float>(WIDTH);
-    vp.height = static_cast<float>(HEIGHT);
+    vp.height = -static_cast<float>(HEIGHT); // Flip viewport for Y up
     vp.minDepth = 0.0f;
     vp.maxDepth = 1.0f;
 
@@ -577,16 +577,16 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
 
     // updates go here
     g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    g_mvp = g_projection * g_view * g_model;
-    g_constants = {g_mvp,
-                   glm::mat3(glm::transpose(g_model)),
+    g_constants = {g_model,
+                   g_view,
+                   g_projection,
                    glm::vec4(g_camera_position.x, g_camera_position.y, g_camera_position.z, 0),
                    frame};
     //
 
     vkCmdPushConstants(cmd,
                        g_pipeline_layout,
-                       VK_SHADER_STAGE_VERTEX_BIT,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                        0,
                        sizeof(UniformConstants),
                        &g_constants);

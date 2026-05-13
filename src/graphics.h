@@ -1,7 +1,7 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-//#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
@@ -21,8 +21,9 @@ struct Frame
 
 struct UniformConstants
 {
-    glm::mat4 mvp;
     glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 projection;
     glm::vec4 camera;
     uint32_t frame;
 };

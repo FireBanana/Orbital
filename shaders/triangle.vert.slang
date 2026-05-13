@@ -1,7 +1,8 @@
 struct UniformConstants
 {
-    float4x4 mvp;
     float4x4 model;
+    float4x4 view;
+    float4x4 projection;
     float4 camera;
     uint32_t frame;
 };
@@ -16,6 +17,7 @@ struct VSInput
 struct VSOutput
 {
     float4 Position : SV_POSITION;
+    float4 WorldPos;
     float3 Normal : NORMAL;
 };
 
@@ -26,7 +28,8 @@ UniformConstants state;
 VSOutput main(VSInput input)
 {        
     VSOutput output;
-    output.Position = mul(state.mvp, float4(input.Position, 1.0));
+    output.Position = mul(state.projection, mul(state.view, mul(state.model, float4(input.Position, 1.0))));
+    output.WorldPos = mul(state.model, float4(input.Position, 1.0));
     output.Normal = input.Normal;
     return output;
 }
