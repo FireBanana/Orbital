@@ -3,6 +3,8 @@
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
+#include "mesh_loader.h"
+
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <glm/glm.hpp>
@@ -28,6 +30,34 @@ struct UniformConstants
     uint32_t frame;
 };
 
+struct TextureDescription
+{
+    uint32_t width;
+    uint32_t height;
+    VkFormat format;
+    VkImageUsageFlags usage;
+    VkImageAspectFlags aspect;
+};
+
+struct BufferData
+{
+    void *data;
+    size_t size;
+};
+
+struct BufferDescription
+{
+    VkDeviceSize buffer_size;
+    VkBufferUsageFlags usage;
+};
+
+struct Buffer
+{
+    VkDeviceMemory memory;
+    VkBuffer buffer;
+    void *mapped_data;
+};
+
 struct Texture
 {
     VkDeviceMemory memory;
@@ -48,18 +78,20 @@ void make_instance();
 
 void make_device();
 
-VkBuffer make_vertex_buffer(VkDeviceSize buffer_size, void *buffer_data, VkBufferUsageFlags flags);
+Buffer make_buffer(BufferDescription desc, void *data = nullptr);
 
 void init_per_frame(int index);
 
-void make_image(VkFormat format,
-                VkImageUsageFlags usage,
-                VkImageAspectFlags aspect,
-                uint32_t width,
-                uint32_t height,
-                VkImage *image,
-                VkImageView *view,
-                void *data = nullptr);
+//VkFormat format,
+// VkImageUsageFlags usage,
+//     VkImageAspectFlags aspect,
+//     uint32_t width,
+//     uint32_t height,
+//     VkImage *image,
+//     VkImageView *view,
+//     void *data = nullptr
+
+Texture make_image(TextureDescription desc, Image *image = nullptr);
 
 void make_swapchain();
 

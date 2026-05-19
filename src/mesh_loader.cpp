@@ -73,14 +73,16 @@ Mesh MeshLoader::load_mesh(const std::string &path)
     return {vertices, indices};
 }
 
-void *MeshLoader::load_image(const std::string &path)
+std::vector<Image> MeshLoader::load_image(const std::string &path)
 {
+    std::vector<Image> result;
+
     auto file = fastgltf::GltfDataBuffer::FromPath(path);
     fastgltf::Parser parser{};
 
     if (!file) {
         std::cout << "error loading file" << std::endl;
-        return nullptr;
+        return result;
     }
 
     auto asset = parser.loadGltf(file.get(), path);
@@ -90,14 +92,13 @@ void *MeshLoader::load_image(const std::string &path)
                        [](auto &arg) {
                            std::cout << "Error: Texture import failed" << std::endl;
                            ;
-                           return (void *) nullptr;
                        },
                        [&](fastgltf::sources::URI &filepath) {
                            const std::string path(filepath.uri.path().begin(),
                                                   filepath.uri.path().end());
                            int width, height, channels;
                            auto *data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-                           return (void *) data;
+                           result.push_back({width, height, channels, data});
                        },
                        [&](fastgltf::sources::Array &vec) {
                            int width, height, channels;
@@ -109,35 +110,32 @@ void *MeshLoader::load_image(const std::string &path)
                                                               &channels,
                                                               4);
 
-                           return (void *) data;
+                           result.push_back({width, height, channels, data});
                        },
                        [&](fastgltf::sources::BufferView &view) {
                            auto &buffer_view = asset->bufferViews[view.bufferViewIndex];
                            auto &buffer = asset->buffers[buffer_view.bufferIndex];
 
-                           std::visit(fastgltf::visitor{[](auto &arg) { return (void *) nullptr; },
-                                                        [&](fastgltf::sources::Array &vec) {
-                                                            int width, height, channels;
+                           auto array_fn = [&](fastgltf::sources::Array &vec) {
+                               int width, height, channels;
 
-                                                            auto *data = stbi_load_from_memory(
-                                                                reinterpret_cast<const stbi_uc *>(
-                                                                    vec.bytes.data()
-                                                                    + buffer_view.byteOffset),
-                                                                static_cast<int>(
-                                                                    buffer_view.byteLength),
-                                                                &width,
-                                                                &height,
-                                                                &channels,
-                                                                4);
+                               auto *data = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(
+                                                                      vec.bytes.data()
+                                                                      + buffer_view.byteOffset),
+                                                                  static_cast<int>(
+                                                                      buffer_view.byteLength),
+                                                                  &width,
+                                                                  &height,
+                                                                  &channels,
+                                                                  4);
 
-                                                            return (void *) data;
-                                                        }},
-                                      buffer.data);
+                               result.push_back({width, height, channels, data});
+                           };
 
-                           return (void *) nullptr;
+                           std::visit(fastgltf::visitor{[](auto &arg) {}, array_fn}, buffer.data);
                        }},
                    i.data);
     }
 
-    return nullptr;
+    return result;
 }

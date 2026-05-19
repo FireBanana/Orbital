@@ -32,9 +32,19 @@ struct Mesh
     std::vector<uint16_t> indices;
 };
 
+struct Image
+{
+    int width;
+    int height;
+    int channels;
+    unsigned char *data;
+
+    //~Image() { delete data; }
+};
+
 class MeshLoader
 {
 public:
     static Mesh load_mesh(const std::string &path);
-    static void *load_image(const std::string &path);
+    static std::vector<Image> load_image(const std::string &path);
 };

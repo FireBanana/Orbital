@@ -35,8 +35,7 @@ UniformConstants g_constants = {g_model, g_view, g_projection, glm::vec4(1.)};
 
 std::vector<VkImage> g_swapchain_images;
 std::vector<VkImageView> g_swapchain_views;
-VkImage g_depth;
-VkImageView g_depth_view;
+Texture g_depth;
 
 // Per frame data
 std::vector<VkSemaphore> g_semaphores;
@@ -166,23 +165,22 @@ void make_device()
     vkGetDeviceQueue(g_device, QUEUE_INDEX, 0, &g_queue);
 }
 
-VkBuffer make_vertex_buffer(VkDeviceSize buffer_size, void *buffer_data, VkBufferUsageFlags flags)
+Buffer make_buffer(BufferDescription desc, void *data)
 {
-    VkBuffer buffer;
+    Buffer result{};
 
     VkBufferCreateInfo vertex_b_info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    vertex_b_info.size = buffer_size;
-    vertex_b_info.usage = flags;
+    vertex_b_info.size = desc.buffer_size;
+    vertex_b_info.usage = desc.usage;
     vertex_b_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(g_device, &vertex_b_info, nullptr, &buffer) == VK_SUCCESS)
+    if (vkCreateBuffer(g_device, &vertex_b_info, nullptr, &result.buffer) == VK_SUCCESS)
         std::cout << "Made triangle buffer" << std::endl;
     else
         std::cout << "Triangle buffer failed" << std::endl;
 
     VkMemoryRequirements mem_req;
-    VkDeviceMemory buff_mem;
-    vkGetBufferMemoryRequirements(g_device, buffer, &mem_req);
+    vkGetBufferMemoryRequirements(g_device, result.buffer, &mem_req);
 
     //Assume memory index 0
     VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
@@ -191,19 +189,20 @@ VkBuffer make_vertex_buffer(VkDeviceSize buffer_size, void *buffer_data, VkBuffe
                                                   mem_req.memoryTypeBits,
                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                                       | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (vkAllocateMemory(g_device, &alloc_info, nullptr, &buff_mem) == VK_SUCCESS)
+    if (vkAllocateMemory(g_device, &alloc_info, nullptr, &result.memory) == VK_SUCCESS)
         std::cout << "Allocated triangle memory" << std::endl;
     else
         std::cout << "Triangle memory failed" << std::endl;
 
-    vkBindBufferMemory(g_device, buffer, buff_mem, 0);
+    vkBindBufferMemory(g_device, result.buffer, result.memory, 0);
 
-    void *data;
-    vkMapMemory(g_device, buff_mem, 0, buffer_size, 0, &data);
-    memcpy(data, buffer_data, (size_t) buffer_size);
-    vkUnmapMemory(g_device, buff_mem);
+    if (data != nullptr) {
+        vkMapMemory(g_device, result.memory, 0, desc.buffer_size, 0, &result.mapped_data);
+        memcpy(result.mapped_data, data, (size_t) desc.buffer_size);
+        vkUnmapMemory(g_device, result.memory);
+    }
 
-    return buffer;
+    return result;
 }
 
 void init_per_frame(int index)
@@ -236,23 +235,15 @@ void init_per_frame(int index)
         std::cout << "buffer failed" << std::endl;
 }
 
-void make_image(VkFormat format,
-                VkImageUsageFlags usage,
-                VkImageAspectFlags aspect,
-                uint32_t width,
-                uint32_t height,
-                VkImage *image,
-                VkImageView *view,
-                void *data)
+Texture make_image(TextureDescription desc, Image *image)
 {
-    Texture texture{};
-    bool is_external = data != nullptr;
+    Texture result{};
 
     VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-    info.format = format;
-    info.usage = usage;
-    info.extent.width = width;
-    info.extent.height = height;
+    info.format = desc.format;
+    info.usage = desc.usage;
+    info.extent.width = desc.width;
+    info.extent.height = desc.height;
     info.extent.depth = 1;
     info.imageType = VK_IMAGE_TYPE_2D;
     info.mipLevels = 1;
@@ -260,11 +251,10 @@ void make_image(VkFormat format,
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
 
-    vkCreateImage(g_device, &info, nullptr, image);
-    texture.image = *image;
+    vkCreateImage(g_device, &info, nullptr, &result.image);
 
     VkMemoryRequirements mem_reqs{};
-    vkGetImageMemoryRequirements(g_device, *image, &mem_reqs);
+    vkGetImageMemoryRequirements(g_device, result.image, &mem_reqs);
 
     VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
     alloc_info.allocationSize = mem_reqs.size;
@@ -272,28 +262,33 @@ void make_image(VkFormat format,
                                                   mem_reqs.memoryTypeBits,
                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkAllocateMemory(g_device, &alloc_info, nullptr, &texture.memory);
-    vkBindImageMemory(g_device, *image, texture.memory, 0);
+    vkAllocateMemory(g_device, &alloc_info, nullptr, &result.memory);
+    vkBindImageMemory(g_device, result.image, result.memory, 0);
 
     VkImageViewCreateInfo create_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    create_info.image = g_depth;
+    create_info.image = result.image;
     create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    create_info.format = format;
-    create_info.subresourceRange.aspectMask = aspect;
+    create_info.format = desc.format;
+    create_info.subresourceRange.aspectMask = desc.aspect;
     create_info.subresourceRange.baseMipLevel = 0;
     create_info.subresourceRange.levelCount = 1;
     create_info.subresourceRange.baseArrayLayer = 0;
     create_info.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(g_device, &create_info, nullptr, view);
-    texture.view = *view;
+    vkCreateImageView(g_device, &create_info, nullptr, &result.view);
 
-    if (is_external) {
+    // Staging
+    if (image != nullptr) {
         VkBufferCreateInfo buffer_info{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                                       .size = 0, ///ADD BUFFFER SIZE HERE!!
+                                       .size = image->width * image->height * sizeof(unsigned char),
                                        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                        .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+
+        VkBuffer buffer;
+        vkCreateBuffer(g_device, &buffer_info, nullptr, &buffer);
     }
+
+    return result;
 }
 
 void make_swapchain()
@@ -560,7 +555,7 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
     color_attachment.clearValue = clear_color_value;
 
     VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    depth_attachment.imageView = g_depth_view;
+    depth_attachment.imageView = g_depth.view;
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -616,7 +611,6 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
                        sizeof(UniformConstants),
                        &g_constants);
 
-    //vkCmdDraw(cmd, vertices.size(), 1, 0, 0);
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 
     vkCmdEndRendering(cmd);
@@ -713,7 +707,7 @@ int g_main()
 
     auto earth = MeshLoader::load_mesh(ROOT "assets/earth.glb");
     auto monkey = MeshLoader::load_mesh(ROOT "assets/monkey.glb");
-    auto tex = MeshLoader::load_image(ROOT "assets/earth.glb");
+    auto images = MeshLoader::load_image(ROOT "assets/earth.glb");
 
     auto *w = glfwCreateWindow(WIDTH, HEIGHT, "Orbital", NULL, NULL);
 
@@ -723,12 +717,12 @@ int g_main()
     make_instance();
     make_device();
 
-    auto vbuffer = make_vertex_buffer(sizeof(vertex) * monkey.vertices.size(),
-                                      monkey.vertices.data(),
-                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    auto ibuffer = make_vertex_buffer(sizeof(uint16_t) * monkey.indices.size(),
-                                      monkey.indices.data(),
-                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+    auto vbuffer = make_buffer({sizeof(vertex) * monkey.vertices.size(),
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT},
+                               monkey.vertices.data());
+    auto ibuffer = make_buffer({sizeof(uint16_t) * monkey.indices.size(),
+                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT},
+                               monkey.indices.data());
 
     if (auto res = glfwCreateWindowSurface(g_instance, w, nullptr, &g_surface); res == VK_SUCCESS)
         std::cout << "Surface creation good" << std::endl;
@@ -737,13 +731,11 @@ int g_main()
 
     make_swapchain();
 
-    make_image(DEPTH_FORMAT,
-               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-               VK_IMAGE_ASPECT_DEPTH_BIT,
-               WIDTH,
-               HEIGHT,
-               &g_depth,
-               &g_depth_view);
+    g_depth = make_image({WIDTH,
+                          HEIGHT,
+                          DEPTH_FORMAT,
+                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                          VK_IMAGE_ASPECT_DEPTH_BIT});
 
     make_pipeline();
 
@@ -809,7 +801,7 @@ int g_main()
             continue;
         }
 
-        render(frame, vbuffer, ibuffer, monkey.indices.size());
+        render(frame, vbuffer.buffer, ibuffer.buffer, monkey.indices.size());
         present_image(frame);
 
         glfwSwapBuffers(w);
