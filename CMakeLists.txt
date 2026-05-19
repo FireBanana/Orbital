@@ -19,13 +19,14 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fastgltf)
 
 add_executable(Orbital src/main.cpp src/mesh_loader.h src/mesh_loader.cpp shaders/triangle.vert.slang shaders/triangle.frag.slang
-    src/graphics.h src/graphics.cpp)
+    src/graphics.h src/graphics.cpp external/stb_image.h)
 
 include(GNUInstallDirs)
 
 target_compile_definitions(Orbital PRIVATE ROOT="${CMAKE_SOURCE_DIR}/")
 
 #target_include_directories(Orbital PRIVATE ${fastgltf_SOURCE_DIR})
+target_include_directories(Orbital PRIVATE "external/")
 
 target_link_libraries(Orbital PRIVATE Vulkan::Vulkan glfw fastgltf::fastgltf)
 

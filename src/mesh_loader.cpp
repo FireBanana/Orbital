@@ -1,8 +1,10 @@
+#define STB_IMAGE_IMPLEMENTATION
 #include "mesh_loader.h"
 #include "fastgltf/core.hpp"
 #include "fastgltf/math.hpp"
 #include "fastgltf/tools.hpp"
 #include "fastgltf/types.hpp"
+#include "stb_image.h"
 #include <iostream>
 
 Mesh MeshLoader::load_mesh(const std::string &path)
@@ -71,23 +73,71 @@ Mesh MeshLoader::load_mesh(const std::string &path)
     return {vertices, indices};
 }
 
-void MeshLoader::load_image(const std::string &path)
+void *MeshLoader::load_image(const std::string &path)
 {
     auto file = fastgltf::GltfDataBuffer::FromPath(path);
     fastgltf::Parser parser{};
 
     if (!file) {
         std::cout << "error loading file" << std::endl;
-        return;
+        return nullptr;
     }
 
     auto asset = parser.loadGltf(file.get(), path);
 
     for (auto &i : asset->images) {
-        std::visit(fastgltf::visitor{[](auto &arg) {},
-                                     [&](fastgltf::sources::URI &filepath) {},
-                                     [&](fastgltf::sources::Array &vec) {},
-                                     [&](fastgltf::sources::BufferView &view) {}},
+        std::visit(fastgltf::visitor{
+                       [](auto &arg) {
+                           std::cout << "Error: Texture import failed" << std::endl;
+                           ;
+                           return (void *) nullptr;
+                       },
+                       [&](fastgltf::sources::URI &filepath) {
+                           const std::string path(filepath.uri.path().begin(),
+                                                  filepath.uri.path().end());
+                           int width, height, channels;
+                           auto *data = stbi_load(path.c_str(), &width, &height, &channels, 4);
+                           return (void *) data;
+                       },
+                       [&](fastgltf::sources::Array &vec) {
+                           int width, height, channels;
+                           auto *data = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(
+                                                                  vec.bytes.data()),
+                                                              static_cast<int>(vec.bytes.size()),
+                                                              &width,
+                                                              &height,
+                                                              &channels,
+                                                              4);
+
+                           return (void *) data;
+                       },
+                       [&](fastgltf::sources::BufferView &view) {
+                           auto &buffer_view = asset->bufferViews[view.bufferViewIndex];
+                           auto &buffer = asset->buffers[buffer_view.bufferIndex];
+
+                           std::visit(fastgltf::visitor{[](auto &arg) { return (void *) nullptr; },
+                                                        [&](fastgltf::sources::Array &vec) {
+                                                            int width, height, channels;
+
+                                                            auto *data = stbi_load_from_memory(
+                                                                reinterpret_cast<const stbi_uc *>(
+                                                                    vec.bytes.data()
+                                                                    + buffer_view.byteOffset),
+                                                                static_cast<int>(
+                                                                    buffer_view.byteLength),
+                                                                &width,
+                                                                &height,
+                                                                &channels,
+                                                                4);
+
+                                                            return (void *) data;
+                                                        }},
+                                      buffer.data);
+
+                           return (void *) nullptr;
+                       }},
                    i.data);
     }
+
+    return nullptr;
 }

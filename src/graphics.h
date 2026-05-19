@@ -28,6 +28,16 @@ struct UniformConstants
     uint32_t frame;
 };
 
+struct Texture
+{
+    VkDeviceMemory memory;
+    VkImage image;
+    VkImageView view;
+    VkSampler sampler;
+    VkExtent2D extent;
+    uint32_t mip_levels;
+};
+
 uint32_t find_memory_type(VkPhysicalDevice phy_device,
                           uint32_t filter_type,
                           VkMemoryPropertyFlags props);
@@ -42,7 +52,14 @@ VkBuffer make_vertex_buffer(VkDeviceSize buffer_size, void *buffer_data, VkBuffe
 
 void init_per_frame(int index);
 
-void make_depth_image();
+void make_image(VkFormat format,
+                VkImageUsageFlags usage,
+                VkImageAspectFlags aspect,
+                uint32_t width,
+                uint32_t height,
+                VkImage *image,
+                VkImageView *view,
+                void *data = nullptr);
 
 void make_swapchain();
 

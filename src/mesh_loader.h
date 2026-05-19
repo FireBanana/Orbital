@@ -36,5 +36,5 @@ class MeshLoader
 {
 public:
     static Mesh load_mesh(const std::string &path);
-    static void load_image(const std::string &path);
+    static void *load_image(const std::string &path);
 };

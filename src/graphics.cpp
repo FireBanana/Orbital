@@ -131,10 +131,17 @@ void make_device()
     // Assume we pick queue 0
 
     float priority = 0.5;
-    const char *extensions[] = {"VK_KHR_swapchain", "VK_KHR_dynamic_rendering"};
+    const char *extensions[] = {"VK_KHR_swapchain",
+                                "VK_KHR_dynamic_rendering",
+                                "VK_EXT_descriptor_buffer"};
+
+    VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_features{
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+        .descriptorBuffer = VK_TRUE};
 
     VkPhysicalDeviceVulkan13Features enable_vulkan13_features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+        .pNext = &descriptor_features,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
     };
@@ -149,7 +156,7 @@ void make_device()
     device_info.queueCreateInfoCount = 1;
     device_info.pQueueCreateInfos = &queue_info;
     device_info.ppEnabledExtensionNames = extensions;
-    device_info.enabledExtensionCount = 2;
+    device_info.enabledExtensionCount = 3;
 
     if (vkCreateDevice(devices[0], &device_info, nullptr, &g_device) == VK_SUCCESS)
         std::cout << "Created device" << std::endl;
@@ -229,13 +236,23 @@ void init_per_frame(int index)
         std::cout << "buffer failed" << std::endl;
 }
 
-void make_depth_image()
+void make_image(VkFormat format,
+                VkImageUsageFlags usage,
+                VkImageAspectFlags aspect,
+                uint32_t width,
+                uint32_t height,
+                VkImage *image,
+                VkImageView *view,
+                void *data)
 {
+    Texture texture{};
+    bool is_external = data != nullptr;
+
     VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
-    info.format = DEPTH_FORMAT;
-    info.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    info.extent.width = WIDTH;
-    info.extent.height = HEIGHT;
+    info.format = format;
+    info.usage = usage;
+    info.extent.width = width;
+    info.extent.height = height;
     info.extent.depth = 1;
     info.imageType = VK_IMAGE_TYPE_2D;
     info.mipLevels = 1;
@@ -243,10 +260,11 @@ void make_depth_image()
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
 
-    vkCreateImage(g_device, &info, nullptr, &g_depth);
+    vkCreateImage(g_device, &info, nullptr, image);
+    texture.image = *image;
 
     VkMemoryRequirements mem_reqs{};
-    vkGetImageMemoryRequirements(g_device, g_depth, &mem_reqs);
+    vkGetImageMemoryRequirements(g_device, *image, &mem_reqs);
 
     VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
     alloc_info.allocationSize = mem_reqs.size;
@@ -254,21 +272,28 @@ void make_depth_image()
                                                   mem_reqs.memoryTypeBits,
                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    VkDeviceMemory img_mem;
-    vkAllocateMemory(g_device, &alloc_info, nullptr, &img_mem);
-    vkBindImageMemory(g_device, g_depth, img_mem, 0);
+    vkAllocateMemory(g_device, &alloc_info, nullptr, &texture.memory);
+    vkBindImageMemory(g_device, *image, texture.memory, 0);
 
     VkImageViewCreateInfo create_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     create_info.image = g_depth;
     create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    create_info.format = DEPTH_FORMAT;
-    create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    create_info.format = format;
+    create_info.subresourceRange.aspectMask = aspect;
     create_info.subresourceRange.baseMipLevel = 0;
     create_info.subresourceRange.levelCount = 1;
     create_info.subresourceRange.baseArrayLayer = 0;
     create_info.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(g_device, &create_info, nullptr, &g_depth_view);
+    vkCreateImageView(g_device, &create_info, nullptr, view);
+    texture.view = *view;
+
+    if (is_external) {
+        VkBufferCreateInfo buffer_info{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                                       .size = 0, ///ADD BUFFFER SIZE HERE!!
+                                       .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                       .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+    }
 }
 
 void make_swapchain()
@@ -688,6 +713,7 @@ int g_main()
 
     auto earth = MeshLoader::load_mesh(ROOT "assets/earth.glb");
     auto monkey = MeshLoader::load_mesh(ROOT "assets/monkey.glb");
+    auto tex = MeshLoader::load_image(ROOT "assets/earth.glb");
 
     auto *w = glfwCreateWindow(WIDTH, HEIGHT, "Orbital", NULL, NULL);
 
@@ -710,7 +736,15 @@ int g_main()
         std::cout << "Surface creation failed " << res << std::endl;
 
     make_swapchain();
-    make_depth_image();
+
+    make_image(DEPTH_FORMAT,
+               VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+               VK_IMAGE_ASPECT_DEPTH_BIT,
+               WIDTH,
+               HEIGHT,
+               &g_depth,
+               &g_depth_view);
+
     make_pipeline();
 
     glfwMakeContextCurrent(w);
