@@ -279,13 +279,64 @@ Texture make_image(TextureDescription desc, Image *image)
 
     // Staging
     if (image != nullptr) {
-        VkBufferCreateInfo buffer_info{.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                                       .size = image->width * image->height * sizeof(unsigned char),
-                                       .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                       .sharingMode = VK_SHARING_MODE_EXCLUSIVE};
+        auto buffer = make_buffer({sizeof(unsigned char *) * image->width * image->height,
+                                   VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT},
+                                  image->data);
 
-        VkBuffer buffer;
-        vkCreateBuffer(g_device, &buffer_info, nullptr, &buffer);
+        // Create and update mip levels here, each level will need VkBufferImageCopy
+        // https://docs.vulkan.org/samples/latest/samples/api/texture_mipmap_generation/README.html
+        VkBufferImageCopy copy_region;
+
+        copy_region.imageSubresource.aspectMask = desc.aspect;
+        copy_region.imageSubresource.mipLevel = 0;
+        copy_region.imageSubresource.baseArrayLayer = 0;
+        copy_region.imageSubresource.layerCount = 1;
+        copy_region.imageExtent.width = image->width;
+        copy_region.imageExtent.height = image->height;
+        copy_region.imageExtent.depth = 1;
+        copy_region.bufferOffset = {0};
+
+        // Pool for this, maybe need a higher order pool handler
+
+        VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+        pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        pool_info.queueFamilyIndex = static_cast<uint32_t>(QUEUE_INDEX);
+
+        VkCommandPool pool;
+        vkCreateCommandPool(g_device, &pool_info, nullptr, &pool);
+
+        VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        buf_info.commandPool = pool;
+        buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        buf_info.commandBufferCount = 1;
+
+        VkCommandBuffer cmd;
+        vkAllocateCommandBuffers(g_device, &buf_info, &cmd);
+
+        VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(cmd, &begin_info);
+
+        VkImageSubresourceRange range{};
+        range.aspectMask = desc.aspect;
+        range.baseMipLevel = 0;
+        range.levelCount = 0;
+        range.layerCount = 1;
+
+        transition_image_layout(cmd,
+                                result.image,
+                                VK_IMAGE_LAYOUT_UNDEFINED,
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                desc.aspect,
+                                {},
+                                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                                VK_PIPELINE_STAGE_2_HOST_BIT,
+                                VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+
+        vkEndCommandBuffer(cmd);
+
+        //submit
     }
 
     return result;
