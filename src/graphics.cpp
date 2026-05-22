@@ -279,7 +279,8 @@ Texture make_image(TextureDescription desc, Image *image)
 
     // Staging
     if (image != nullptr) {
-        auto buffer = make_buffer({sizeof(unsigned char *) * image->width * image->height,
+        auto buffer = make_buffer({sizeof(unsigned char) * image->width * image->height
+                                       * image->channels,
                                    VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT},
                                   image->data);
 
@@ -337,6 +338,21 @@ Texture make_image(TextureDescription desc, Image *image)
         vkEndCommandBuffer(cmd);
 
         //submit
+        VkSemaphore staging_semaphore;
+        VkSemaphoreCreateInfo sem_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        vkCreateSemaphore(g_device, &sem_info, nullptr, &staging_semaphore);
+
+        VkFence staging_fence;
+        VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        vkCreateFence(g_device, &fence_info, nullptr, &staging_fence);
+
+        VkSubmitInfo submit_info{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submit_info.commandBufferCount = 1;
+        submit_info.pCommandBuffers = &cmd;
+        submit_info.signalSemaphoreCount = 1;
+        submit_info.pSignalSemaphores = &staging_semaphore;
+
+        vkQueueSubmit(g_queue, 1, &submit_info, staging_fence);
     }
 
     return result;
@@ -787,6 +803,13 @@ int g_main()
                           DEPTH_FORMAT,
                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                           VK_IMAGE_ASPECT_DEPTH_BIT});
+
+    make_image({images[0].width,
+                images[0].height,
+                FORMAT,
+                VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                VK_IMAGE_ASPECT_COLOR_BIT},
+               &images[0]);
 
     make_pipeline();
 

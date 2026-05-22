@@ -98,7 +98,10 @@ std::vector<Image> MeshLoader::load_image(const std::string &path)
                                                   filepath.uri.path().end());
                            int width, height, channels;
                            auto *data = stbi_load(path.c_str(), &width, &height, &channels, 4);
-                           result.push_back({width, height, channels, data});
+                           result.push_back({static_cast<uint32_t>(width),
+                                             static_cast<uint32_t>(height),
+                                             static_cast<uint32_t>(channels),
+                                             data});
                        },
                        [&](fastgltf::sources::Array &vec) {
                            int width, height, channels;
@@ -110,7 +113,10 @@ std::vector<Image> MeshLoader::load_image(const std::string &path)
                                                               &channels,
                                                               4);
 
-                           result.push_back({width, height, channels, data});
+                           result.push_back({static_cast<uint32_t>(width),
+                                             static_cast<uint32_t>(height),
+                                             static_cast<uint32_t>(channels),
+                                             data});
                        },
                        [&](fastgltf::sources::BufferView &view) {
                            auto &buffer_view = asset->bufferViews[view.bufferViewIndex];
@@ -129,7 +135,10 @@ std::vector<Image> MeshLoader::load_image(const std::string &path)
                                                                   &channels,
                                                                   4);
 
-                               result.push_back({width, height, channels, data});
+                               result.push_back({static_cast<uint32_t>(width),
+                                                 static_cast<uint32_t>(height),
+                                                 static_cast<uint32_t>(channels),
+                                                 data});
                            };
 
                            std::visit(fastgltf::visitor{[](auto &arg) {}, array_fn}, buffer.data);
