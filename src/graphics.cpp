@@ -22,6 +22,7 @@ VkSurfaceKHR g_surface;
 VkSwapchainKHR g_swapchain;
 VkPipeline g_pipeline;
 VkPipelineLayout g_pipeline_layout;
+VkDescriptorSetLayout g_descriptor_layout;
 
 glm::vec3 g_camera_position = glm::vec3(0., 0., 3.);
 glm::mat4 g_model = glm::mat4(1.0f);
@@ -425,6 +426,8 @@ void make_pipeline()
     range.size = sizeof(UniformConstants);
 
     VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    layout_info.setLayoutCount = 1;
+    layout_info.pSetLayouts = &g_descriptor_layout;
 
     layout_info.pushConstantRangeCount = 1;
     layout_info.pPushConstantRanges = &range;
@@ -543,6 +546,23 @@ void make_pipeline()
         std::cout << "pipeline failed" << std::endl;
 
     //delete shader modules
+}
+
+void make_descriptor()
+{
+    VkDescriptorSetLayoutBinding binding;
+    binding.binding = 0;
+    binding.descriptorCount = 1;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    info.flags
+        = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+    info.bindingCount = 1;
+    info.pBindings = &binding;
+
+    vkCreateDescriptorSetLayout(g_device, &info, nullptr, &g_descriptor_layout);
 }
 
 void transition_image_layout(VkCommandBuffer cmd,
@@ -810,6 +830,8 @@ int g_main()
                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                 VK_IMAGE_ASPECT_COLOR_BIT},
                &images[0]);
+
+    make_descriptor();
 
     make_pipeline();
 

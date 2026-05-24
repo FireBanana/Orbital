@@ -97,6 +97,8 @@ void make_swapchain();
 
 void make_pipeline();
 
+void make_descriptor();
+
 void transition_image_layout(VkCommandBuffer cmd,
                              VkImage img,
                              VkImageLayout oldLayout,
