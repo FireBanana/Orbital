@@ -133,7 +133,7 @@ std::vector<Image> MeshLoader::load_image(const std::string &path)
                                                                   &width,
                                                                   &height,
                                                                   &channels,
-                                                                  4);
+                                                                  0);
 
                                result.push_back({static_cast<uint32_t>(width),
                                                  static_cast<uint32_t>(height),

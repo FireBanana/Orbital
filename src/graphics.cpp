@@ -23,6 +23,7 @@ VkSwapchainKHR g_swapchain;
 VkPipeline g_pipeline;
 VkPipelineLayout g_pipeline_layout;
 VkDescriptorSetLayout g_descriptor_layout;
+VkSampler g_sampler;
 
 glm::vec3 g_camera_position = glm::vec3(0., 0., 3.);
 glm::mat4 g_model = glm::mat4(1.0f);
@@ -88,13 +89,13 @@ VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits b
 
 void make_instance()
 {
-    // uint32_t inst_extension_count = 0;
-    // vkEnumerateInstanceExtensionProperties(nullptr, &inst_extension_count, nullptr);
+    uint32_t inst_extension_count = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &inst_extension_count, nullptr);
 
-    // std::vector<VkExtensionProperties> extension{inst_extension_count};
-    // vkEnumerateInstanceExtensionProperties(nullptr, &inst_extension_count, extension.data());
+    std::vector<VkExtensionProperties> extension{inst_extension_count};
+    vkEnumerateInstanceExtensionProperties(nullptr, &inst_extension_count, extension.data());
 
-    // std::cout << "Found " << inst_extension_count << " extensions" <<std::endl;
+    std::cout << "Found " << inst_extension_count << " extensions" << std::endl;
 
     VkApplicationInfo app_info{};
     app_info.pApplicationName = "Orbital";
@@ -287,7 +288,7 @@ Texture make_image(TextureDescription desc, Image *image)
 
         // Create and update mip levels here, each level will need VkBufferImageCopy
         // https://docs.vulkan.org/samples/latest/samples/api/texture_mipmap_generation/README.html
-        VkBufferImageCopy copy_region;
+        VkBufferImageCopy copy_region{};
 
         copy_region.imageSubresource.aspectMask = desc.aspect;
         copy_region.imageSubresource.mipLevel = 0;
@@ -296,7 +297,10 @@ Texture make_image(TextureDescription desc, Image *image)
         copy_region.imageExtent.width = image->width;
         copy_region.imageExtent.height = image->height;
         copy_region.imageExtent.depth = 1;
+        copy_region.imageOffset = {0, 0, 0};
         copy_region.bufferOffset = {0};
+        copy_region.bufferRowLength = 0;
+        copy_region.bufferImageHeight = 0;
 
         // Pool for this, maybe need a higher order pool handler
 
@@ -336,6 +340,23 @@ Texture make_image(TextureDescription desc, Image *image)
                                 VK_PIPELINE_STAGE_2_HOST_BIT,
                                 VK_PIPELINE_STAGE_2_TRANSFER_BIT);
 
+        vkCmdCopyBufferToImage(cmd,
+                               buffer.buffer,
+                               result.image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               1,
+                               &copy_region);
+
+        transition_image_layout(cmd,
+                                result.image,
+                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                                desc.aspect,
+                                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                                VK_ACCESS_2_SHADER_READ_BIT,
+                                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+
         vkEndCommandBuffer(cmd);
 
         //submit
@@ -354,6 +375,8 @@ Texture make_image(TextureDescription desc, Image *image)
         submit_info.pSignalSemaphores = &staging_semaphore;
 
         vkQueueSubmit(g_queue, 1, &submit_info, staging_fence);
+
+        vkWaitForFences(g_device, 1, &staging_fence, VK_TRUE, UINT64_MAX);
     }
 
     return result;
@@ -553,8 +576,9 @@ void make_descriptor()
     VkDescriptorSetLayoutBinding binding;
     binding.binding = 0;
     binding.descriptorCount = 1;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    binding.pImmutableSamplers = &g_sampler;
 
     VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     info.flags
@@ -563,6 +587,13 @@ void make_descriptor()
     info.pBindings = &binding;
 
     vkCreateDescriptorSetLayout(g_device, &info, nullptr, &g_descriptor_layout);
+}
+
+void make_sampler()
+{
+    VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+
+    vkCreateSampler(g_device, &info, nullptr, &g_sampler);
 }
 
 void transition_image_layout(VkCommandBuffer cmd,
@@ -599,7 +630,11 @@ void transition_image_layout(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_t index_count)
+void render(uint32_t img,
+            VkBuffer vertex_buffer,
+            VkBuffer index_buffer,
+            uint32_t index_count,
+            Texture *model_texture)
 {
     static uint32_t frame = 0;
 
@@ -697,6 +732,19 @@ void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_
                        0,
                        sizeof(UniformConstants),
                        &g_constants);
+
+    VkDescriptorImageInfo image_info{};
+    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image_info.imageView = model_texture->view;
+    image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+
+    VkWriteDescriptorSet write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    write_set.dstBinding = 0;
+    write_set.descriptorCount = 1;
+    write_set.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write_set.pImageInfo = &image_info;
+
+    vkCmdPushDescriptorSet(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipeline_layout, 0, 1, &write_set);
 
     vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
 
@@ -824,15 +872,15 @@ int g_main()
                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                           VK_IMAGE_ASPECT_DEPTH_BIT});
 
-    make_image({images[0].width,
-                images[0].height,
-                FORMAT,
-                VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                VK_IMAGE_ASPECT_COLOR_BIT},
-               &images[0]);
+    auto model_tex = make_image({images[0].width,
+                                 images[0].height,
+                                 VK_FORMAT_R8G8B8_SRGB,
+                                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                 VK_IMAGE_ASPECT_COLOR_BIT},
+                                &images[0]);
 
+    make_sampler();
     make_descriptor();
-
     make_pipeline();
 
     glfwMakeContextCurrent(w);
@@ -897,7 +945,7 @@ int g_main()
             continue;
         }
 
-        render(frame, vbuffer.buffer, ibuffer.buffer, monkey.indices.size());
+        render(frame, vbuffer.buffer, ibuffer.buffer, monkey.indices.size(), &model_tex);
         present_image(frame);
 
         glfwSwapBuffers(w);

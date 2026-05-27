@@ -19,6 +19,7 @@ struct VSOutput
     float4 Position : SV_POSITION;
     float4 WorldPos;
     float3 Normal : NORMAL;
+    float2 Uv : TEXCOORD0;
 };
 
 [[vk::push_constant]]
@@ -31,5 +32,6 @@ VSOutput main(VSInput input)
     output.Position = mul(state.projection, mul(state.view, mul(state.model, float4(input.Position, 1.0))));
     output.WorldPos = mul(state.model, float4(input.Position, 1.0));
     output.Normal = input.Normal;
+    output.Uv = input.Uv;
     return output;
 }

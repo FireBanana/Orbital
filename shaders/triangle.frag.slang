@@ -12,12 +12,19 @@ struct VSOutput
     float4 Position : SV_POSITION;
     float4 WorldPos;
     float3 Normal : NORMAL;
+    float2 Uv : TEXCOORD0;
 };
 
-static float3 g_light_dir = {-0.8, -1.0, -3.0};
+static float3 g_light_dir = {-0.8, -1.0, 3.0};
 
 [[vk::push_constant]]
 UniformConstants state;
+
+[[vk::binding(0, 0)]]
+Texture2D<float4> diffuse_texture;
+
+[[vk::binding(0, 0)]]
+SamplerState diffuse_sampler;
 
 float schlick(float3 normal, float3 pos)
 {
@@ -36,9 +43,10 @@ float4 main(VSOutput input)
     //g_light_dir.x *= sin(state.frame * 0.01);
     //g_light_dir.z *= cos(state.frame * 0.01);
 
-    float3 color = max(dot(normalize(g_light_dir), normalize(input.Normal)), float3(0.));
-    color /= 3.142;
+    float3 light = max(dot(normalize(g_light_dir), normalize(input.Normal)), float3(0.));
+    light /= 3.142;
     float ambient = 30.;
 
-    return float4(color + ambient * schlick(input.Normal, input.WorldPos.xyz), 1.0);
+    float4 color = diffuse_texture.Sample(diffuse_sampler, input.Uv);
+    return float4(color.rgb * light + ambient * schlick(input.Normal, input.WorldPos.xyz), 1.0);
 }

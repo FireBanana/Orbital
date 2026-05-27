@@ -99,6 +99,8 @@ void make_pipeline();
 
 void make_descriptor();
 
+void make_sampler();
+
 void transition_image_layout(VkCommandBuffer cmd,
                              VkImage img,
                              VkImageLayout oldLayout,
@@ -109,7 +111,11 @@ void transition_image_layout(VkCommandBuffer cmd,
                              VkPipelineStageFlags2 srcStage,
                              VkPipelineStageFlags2 dstStage);
 
-void render(uint32_t img, VkBuffer vertex_buffer, VkBuffer index_buffer, uint32_t index_count);
+void render(uint32_t img,
+            VkBuffer vertex_buffer,
+            VkBuffer index_buffer,
+            uint32_t index_count,
+            Texture *model_texture);
 
 VkResult present_image(uint32_t index);
 
