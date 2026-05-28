@@ -1,13 +1,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "mesh_loader.h"
-#include "fastgltf/core.hpp"
 #include "fastgltf/math.hpp"
 #include "fastgltf/tools.hpp"
-#include "fastgltf/types.hpp"
 #include "stb_image.h"
 #include <iostream>
 
-Mesh MeshLoader::load_mesh(const std::string &path)
+Model MeshLoader::load_model(const std::string &path)
 {
     auto file = fastgltf::GltfDataBuffer::FromPath(path);
     fastgltf::Parser parser{};
@@ -26,6 +24,11 @@ Mesh MeshLoader::load_mesh(const std::string &path)
 
     std::cout << "model loaded successfully" << std::endl;
 
+    return {load_image(asset), load_mesh(asset)};
+}
+
+Mesh MeshLoader::load_mesh(fastgltf::Expected<fastgltf::Asset> &asset)
+{
     auto &mesh = asset->meshes[0];
 
     std::vector<vertex> vertices;
@@ -73,25 +76,14 @@ Mesh MeshLoader::load_mesh(const std::string &path)
     return {vertices, indices};
 }
 
-std::vector<Image> MeshLoader::load_image(const std::string &path)
+std::vector<Image> MeshLoader::load_image(fastgltf::Expected<fastgltf::Asset> &asset)
 {
     std::vector<Image> result;
-
-    auto file = fastgltf::GltfDataBuffer::FromPath(path);
-    fastgltf::Parser parser{};
-
-    if (!file) {
-        std::cout << "error loading file" << std::endl;
-        return result;
-    }
-
-    auto asset = parser.loadGltf(file.get(), path);
 
     for (auto &i : asset->images) {
         std::visit(fastgltf::visitor{
                        [](auto &arg) {
                            std::cout << "Error: Texture import failed" << std::endl;
-                           ;
                        },
                        [&](fastgltf::sources::URI &filepath) {
                            const std::string path(filepath.uri.path().begin(),

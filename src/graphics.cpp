@@ -630,11 +630,7 @@ void transition_image_layout(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void render(uint32_t img,
-            VkBuffer vertex_buffer,
-            VkBuffer index_buffer,
-            uint32_t index_count,
-            Texture *model_texture)
+void render(uint32_t img, std::vector<NativeModel> models)
 {
     static uint32_t frame = 0;
 
@@ -654,16 +650,6 @@ void render(uint32_t img,
                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                             VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
-
-    // transition_image_layout(cmd,
-    //                         g_depth,
-    //                         VK_IMAGE_LAYOUT_UNDEFINED,
-    //                         VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-    //                         VK_IMAGE_ASPECT_DEPTH_BIT,
-    //                         VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-    //                         0,
-    //                         VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-    //                         VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
 
     VkClearValue clear_color_value{}, depth_clear_value{};
     clear_color_value.color = {{0, 0, 0}};
@@ -713,41 +699,52 @@ void render(uint32_t img,
     vkCmdSetScissor(cmd, 0, 1, &scissor);
     vkCmdSetCullMode(cmd, VK_CULL_MODE_BACK_BIT);
 
-    VkDeviceSize offset{0};
-    vkCmdBindVertexBuffers(cmd, 0, 1, &vertex_buffer, &offset);
-    vkCmdBindIndexBuffer(cmd, index_buffer, offset, VK_INDEX_TYPE_UINT16);
+    auto modelT = g_model;
 
-    // updates go here
-    g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-    g_constants = {g_model,
-                   g_view,
-                   g_projection,
-                   glm::vec4(g_camera_position.x, g_camera_position.y, g_camera_position.z, 0),
-                   frame};
-    //
+    for (auto &model : models) {
+        // updates go here
 
-    vkCmdPushConstants(cmd,
-                       g_pipeline_layout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0,
-                       sizeof(UniformConstants),
-                       &g_constants);
+        g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        g_constants = {modelT,
+                       g_view,
+                       g_projection,
+                       glm::vec4(g_camera_position.x, g_camera_position.y, g_camera_position.z, 0),
+                       frame};
+        //
 
-    VkDescriptorImageInfo image_info{};
-    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    image_info.imageView = model_texture->view;
-    image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+        vkCmdPushConstants(cmd,
+                           g_pipeline_layout,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(UniformConstants),
+                           &g_constants);
 
-    VkWriteDescriptorSet write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    write_set.dstBinding = 0;
-    write_set.descriptorCount = 1;
-    write_set.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    write_set.pImageInfo = &image_info;
+        VkDeviceSize offset{0};
+        vkCmdBindVertexBuffers(cmd, 0, 1, &model.vertex.buffer, &offset);
+        vkCmdBindIndexBuffer(cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT16);
 
-    vkCmdPushDescriptorSet(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipeline_layout, 0, 1, &write_set);
+        VkDescriptorImageInfo image_info{};
+        image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        image_info.imageView = model.texture.view;
+        image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
-    vkCmdDrawIndexed(cmd, index_count, 1, 0, 0, 0);
+        VkWriteDescriptorSet write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        write_set.dstBinding = 0;
+        write_set.descriptorCount = 1;
+        write_set.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        write_set.pImageInfo = &image_info;
 
+        vkCmdPushDescriptorSet(cmd,
+                               VK_PIPELINE_BIND_POINT_GRAPHICS,
+                               g_pipeline_layout,
+                               0,
+                               1,
+                               &write_set);
+
+        vkCmdDrawIndexed(cmd, model.index_count, 1, 0, 0, 0);
+
+        modelT = glm::translate(modelT, glm::vec3(0, 0, 3));
+    }
     vkCmdEndRendering(cmd);
 
     transition_image_layout(cmd,
@@ -832,6 +829,25 @@ VkResult acquire_swapchain_image(uint32_t *img)
     return res;
 }
 
+NativeModel make_native_model(Model &model)
+{
+    auto vbuffer = make_buffer({sizeof(vertex) * model.mesh.vertices.size(),
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT},
+                               model.mesh.vertices.data());
+    auto ibuffer = make_buffer({sizeof(uint16_t) * model.mesh.indices.size(),
+                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT},
+                               model.mesh.indices.data());
+
+    auto model_tex = make_image({model.material.textures[0].width,
+                                 model.material.textures[0].height,
+                                 VK_FORMAT_R8G8B8_SRGB,
+                                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                 VK_IMAGE_ASPECT_COLOR_BIT},
+                                &model.material.textures[0]);
+
+    return {vbuffer, ibuffer, model_tex, static_cast<uint32_t>(model.mesh.indices.size())};
+}
+
 int g_main()
 {
     if (!glfwInit())
@@ -840,10 +856,6 @@ int g_main()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_DECORATED, GL_TRUE);
 
-    auto earth = MeshLoader::load_mesh(ROOT "assets/earth.glb");
-    auto monkey = MeshLoader::load_mesh(ROOT "assets/monkey.glb");
-    auto images = MeshLoader::load_image(ROOT "assets/earth.glb");
-
     auto *w = glfwCreateWindow(WIDTH, HEIGHT, "Orbital", NULL, NULL);
 
     if (!w)
@@ -851,13 +863,6 @@ int g_main()
 
     make_instance();
     make_device();
-
-    auto vbuffer = make_buffer({sizeof(vertex) * monkey.vertices.size(),
-                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT},
-                               monkey.vertices.data());
-    auto ibuffer = make_buffer({sizeof(uint16_t) * monkey.indices.size(),
-                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT},
-                               monkey.indices.data());
 
     if (auto res = glfwCreateWindowSurface(g_instance, w, nullptr, &g_surface); res == VK_SUCCESS)
         std::cout << "Surface creation good" << std::endl;
@@ -871,13 +876,6 @@ int g_main()
                           DEPTH_FORMAT,
                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                           VK_IMAGE_ASPECT_DEPTH_BIT});
-
-    auto model_tex = make_image({images[0].width,
-                                 images[0].height,
-                                 VK_FORMAT_R8G8B8_SRGB,
-                                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                 VK_IMAGE_ASPECT_COLOR_BIT},
-                                &images[0]);
 
     make_sampler();
     make_descriptor();
@@ -936,6 +934,16 @@ int g_main()
         last_y_position = ypos;
     });
 
+    // ===== Load assets ======
+
+    auto earth_asset = MeshLoader::load_model(ROOT "assets/earth.glb");
+    auto monkey_asset = MeshLoader::load_model(ROOT "assets/monkey.glb");
+
+    auto monkey = make_native_model(monkey_asset);
+    auto earth = make_native_model(earth_asset);
+
+    // ========================
+
     while (!glfwWindowShouldClose(w)) {
         uint32_t frame;
         auto r = acquire_swapchain_image(&frame);
@@ -945,7 +953,7 @@ int g_main()
             continue;
         }
 
-        render(frame, vbuffer.buffer, ibuffer.buffer, monkey.indices.size(), &model_tex);
+        render(frame, {earth, monkey});
         present_image(frame);
 
         glfwSwapBuffers(w);

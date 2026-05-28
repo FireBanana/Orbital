@@ -19,7 +19,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(fastgltf)
 
 add_executable(Orbital src/main.cpp src/mesh_loader.h src/mesh_loader.cpp shaders/triangle.vert.slang shaders/triangle.frag.slang
-    src/graphics.h src/graphics.cpp external/stb_image.h)
+    src/graphics.h src/graphics.cpp external/stb_image.h
+    src/types.h
+)
 
 include(GNUInstallDirs)
 

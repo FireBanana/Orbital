@@ -68,6 +68,14 @@ struct Texture
     uint32_t mip_levels;
 };
 
+struct NativeModel
+{
+    Buffer vertex;
+    Buffer index;
+    Texture texture;
+    uint32_t index_count;
+};
+
 uint32_t find_memory_type(VkPhysicalDevice phy_device,
                           uint32_t filter_type,
                           VkMemoryPropertyFlags props);
@@ -81,15 +89,6 @@ void make_device();
 Buffer make_buffer(BufferDescription desc, void *data = nullptr);
 
 void init_per_frame(int index);
-
-//VkFormat format,
-// VkImageUsageFlags usage,
-//     VkImageAspectFlags aspect,
-//     uint32_t width,
-//     uint32_t height,
-//     VkImage *image,
-//     VkImageView *view,
-//     void *data = nullptr
 
 Texture make_image(TextureDescription desc, Image *image = nullptr);
 
@@ -111,15 +110,13 @@ void transition_image_layout(VkCommandBuffer cmd,
                              VkPipelineStageFlags2 srcStage,
                              VkPipelineStageFlags2 dstStage);
 
-void render(uint32_t img,
-            VkBuffer vertex_buffer,
-            VkBuffer index_buffer,
-            uint32_t index_count,
-            Texture *model_texture);
+void render(uint32_t img, std::vector<NativeModel> models);
 
 VkResult present_image(uint32_t index);
 
 VkResult acquire_swapchain_image(uint32_t *img);
+
+NativeModel make_native_model(Model &model);
 
 int g_main();
 
