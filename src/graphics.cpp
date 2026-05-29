@@ -25,7 +25,7 @@ VkPipelineLayout g_pipeline_layout;
 VkDescriptorSetLayout g_descriptor_layout;
 VkSampler g_sampler;
 
-glm::vec3 g_camera_position = glm::vec3(0., 0., 3.);
+glm::vec3 g_camera_position = glm::vec3(0., 0., 3.0);
 glm::mat4 g_model = glm::mat4(1.0f);
 glm::mat4 g_view = glm::lookAtRH(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 glm::mat4 g_projection = glm::perspectiveZO(glm::radians(60.0f),
@@ -840,7 +840,7 @@ NativeModel make_native_model(Model &model)
 
     auto model_tex = make_image({model.material.textures[0].width,
                                  model.material.textures[0].height,
-                                 VK_FORMAT_R8G8B8_SRGB,
+                                 VK_FORMAT_R8G8B8A8_SRGB,
                                  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                  VK_IMAGE_ASPECT_COLOR_BIT},
                                 &model.material.textures[0]);
@@ -889,6 +889,9 @@ int g_main()
     {
         bool new_click;
         bool is_pressed;
+        double x_delta = 0.0;
+        double y_delta = 0.0;
+        double camera_distance = g_camera_position.z;
     } state;
 
     glfwSetWindowUserPointer(w, &state);
@@ -908,8 +911,6 @@ int g_main()
 
     glfwSetCursorPosCallback(w, [](GLFWwindow *window, double xpos, double ypos) {
         static double last_x_position = xpos, last_y_position = ypos;
-        static double x_delta = 0.0;
-        static double y_delta = 0.0;
 
         auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
 
@@ -922,16 +923,34 @@ int g_main()
             state->new_click = false;
         }
 
-        x_delta -= xpos - last_x_position;
-        y_delta += ypos - last_y_position;
-        y_delta = glm::clamp(y_delta, -130.0 + 0.01, 130.0 - 0.01);
+        state->x_delta -= xpos - last_x_position;
+        state->y_delta += ypos - last_y_position;
+        state->y_delta = glm::clamp(state->y_delta, -130.0 + 0.01, 130.0 - 0.01);
 
-        g_camera_position = glm::vec3(3. * (glm::sin(x_delta * 0.01) * glm::cos(y_delta * 0.01)),
-                                      3. * (glm::sin(y_delta * 0.01)),
-                                      3. * (glm::cos(x_delta * 0.01) * glm::cos(y_delta * 0.01)));
+        g_camera_position = glm::vec3(state->camera_distance
+                                          * (glm::sin(state->x_delta * 0.01)
+                                             * glm::cos(state->y_delta * 0.01)),
+                                      state->camera_distance * (glm::sin(state->y_delta * 0.01)),
+                                      state->camera_distance
+                                          * (glm::cos(state->x_delta * 0.01)
+                                             * glm::cos(state->y_delta * 0.01)));
 
         last_x_position = xpos;
         last_y_position = ypos;
+    });
+
+    glfwSetScrollCallback(w, [](GLFWwindow *window, double xoffset, double yoffset) {
+        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
+
+        state->camera_distance -= yoffset * 0.2;
+
+        g_camera_position = glm::vec3(state->camera_distance
+                                          * (glm::sin(state->x_delta * 0.01)
+                                             * glm::cos(state->y_delta * 0.01)),
+                                      state->camera_distance * (glm::sin(state->y_delta * 0.01)),
+                                      state->camera_distance
+                                          * (glm::cos(state->x_delta * 0.01)
+                                             * glm::cos(state->y_delta * 0.01)));
     });
 
     // ===== Load assets ======

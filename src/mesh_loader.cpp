@@ -125,11 +125,11 @@ std::vector<Image> MeshLoader::load_image(fastgltf::Expected<fastgltf::Asset> &a
                                                                   &width,
                                                                   &height,
                                                                   &channels,
-                                                                  0);
+                                                                  4);
 
                                result.push_back({static_cast<uint32_t>(width),
                                                  static_cast<uint32_t>(height),
-                                                 static_cast<uint32_t>(channels),
+                                                 static_cast<uint32_t>(4),
                                                  data});
                            };
 
