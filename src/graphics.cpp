@@ -1,47 +1,11 @@
 #include "graphics.h"
+#include "global.h"
 #include "mesh_loader.h"
 #include <array>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <vector>
-
-constexpr uint32_t QUEUE_INDEX = 0;
-constexpr uint32_t WIDTH = 1920;
-constexpr uint32_t HEIGHT = 969;
-constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
-constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
-constexpr uint32_t SWAPCHAIN_SIZE = 3;
-constexpr uint32_t FRAMES_IN_FLIGHT = 2;
-
-VkInstance g_instance;
-VkPhysicalDevice g_physical_device;
-VkDevice g_device;
-VkQueue g_queue;
-VkSurfaceKHR g_surface;
-VkSwapchainKHR g_swapchain;
-VkPipeline g_pipeline;
-VkPipelineLayout g_pipeline_layout;
-VkDescriptorSetLayout g_descriptor_layout;
-VkSampler g_sampler;
-
-glm::vec3 g_camera_position = glm::vec3(0., 0., 3.0);
-glm::mat4 g_model = glm::mat4(1.0f);
-glm::mat4 g_view = glm::lookAtRH(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-glm::mat4 g_projection = glm::perspectiveZO(glm::radians(60.0f),
-                                            (float) WIDTH / (float) HEIGHT,
-                                            0.1f,
-                                            1000.0f);
-
-UniformConstants g_constants = {g_model, g_view, g_projection, glm::vec4(1.)};
-
-std::vector<VkImage> g_swapchain_images;
-std::vector<VkImageView> g_swapchain_views;
-Texture g_depth;
-
-// Per frame data
-std::vector<VkSemaphore> g_semaphores;
-std::array<Frame, SWAPCHAIN_SIZE> g_frame_data{};
 
 uint32_t find_memory_type(VkPhysicalDevice phy_device,
                           uint32_t filter_type,
@@ -80,7 +44,7 @@ VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits b
     create_info.pCode = buffer.data();
 
     VkShaderModule module;
-    if (vkCreateShaderModule(g_device, &create_info, nullptr, &module) == VK_SUCCESS)
+    if (vkCreateShaderModule(Global::g_device, &create_info, nullptr, &module) == VK_SUCCESS)
         std::cout << "Shader made" << std::endl;
     else
         std::cout << "Shader failed" << std::endl;
@@ -110,7 +74,7 @@ void make_instance()
     info.enabledExtensionCount = ext_count;
     info.ppEnabledExtensionNames = extensions;
 
-    if (vkCreateInstance(&info, nullptr, &g_instance) == VK_SUCCESS)
+    if (vkCreateInstance(&info, nullptr, &Global::g_instance) == VK_SUCCESS)
         std::cout << "Created instance" << std::endl;
     else
         std::cout << "Creation instance failed" << std::endl;
@@ -119,14 +83,14 @@ void make_instance()
 void make_device()
 {
     uint32_t gpu_count = 0;
-    vkEnumeratePhysicalDevices(g_instance, &gpu_count, nullptr);
+    vkEnumeratePhysicalDevices(Global::g_instance, &gpu_count, nullptr);
 
     std::vector<VkPhysicalDevice> devices{gpu_count};
-    vkEnumeratePhysicalDevices(g_instance, &gpu_count, devices.data());
+    vkEnumeratePhysicalDevices(Global::g_instance, &gpu_count, devices.data());
 
     std::cout << "Found " << gpu_count << " gpus" << std::endl;
 
-    g_physical_device = devices[0];
+    Global::g_physical_device = devices[0];
 
     // Assume everythings supported
     // Assume we pick queue 0
@@ -148,7 +112,7 @@ void make_device()
     };
 
     VkDeviceQueueCreateInfo queue_info{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-    queue_info.queueFamilyIndex = QUEUE_INDEX;
+    queue_info.queueFamilyIndex = Global::QUEUE_INDEX;
     queue_info.queueCount = 1;
     queue_info.pQueuePriorities = &priority;
 
@@ -159,12 +123,12 @@ void make_device()
     device_info.ppEnabledExtensionNames = extensions;
     device_info.enabledExtensionCount = 3;
 
-    if (vkCreateDevice(devices[0], &device_info, nullptr, &g_device) == VK_SUCCESS)
+    if (vkCreateDevice(devices[0], &device_info, nullptr, &Global::g_device) == VK_SUCCESS)
         std::cout << "Created device" << std::endl;
     else
         std::cout << "Creating device failed" << std::endl;
 
-    vkGetDeviceQueue(g_device, QUEUE_INDEX, 0, &g_queue);
+    vkGetDeviceQueue(Global::g_device, Global::QUEUE_INDEX, 0, &Global::g_queue);
 }
 
 Buffer make_buffer(BufferDescription desc, void *data)
@@ -176,32 +140,32 @@ Buffer make_buffer(BufferDescription desc, void *data)
     vertex_b_info.usage = desc.usage;
     vertex_b_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(g_device, &vertex_b_info, nullptr, &result.buffer) == VK_SUCCESS)
+    if (vkCreateBuffer(Global::g_device, &vertex_b_info, nullptr, &result.buffer) == VK_SUCCESS)
         std::cout << "Made triangle buffer" << std::endl;
     else
         std::cout << "Triangle buffer failed" << std::endl;
 
     VkMemoryRequirements mem_req;
-    vkGetBufferMemoryRequirements(g_device, result.buffer, &mem_req);
+    vkGetBufferMemoryRequirements(Global::g_device, result.buffer, &mem_req);
 
     //Assume memory index 0
     VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
     alloc_info.allocationSize = mem_req.size;
-    alloc_info.memoryTypeIndex = find_memory_type(g_physical_device,
+    alloc_info.memoryTypeIndex = find_memory_type(Global::g_physical_device,
                                                   mem_req.memoryTypeBits,
                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                                       | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    if (vkAllocateMemory(g_device, &alloc_info, nullptr, &result.memory) == VK_SUCCESS)
+    if (vkAllocateMemory(Global::g_device, &alloc_info, nullptr, &result.memory) == VK_SUCCESS)
         std::cout << "Allocated triangle memory" << std::endl;
     else
         std::cout << "Triangle memory failed" << std::endl;
 
-    vkBindBufferMemory(g_device, result.buffer, result.memory, 0);
+    vkBindBufferMemory(Global::g_device, result.buffer, result.memory, 0);
 
     if (data != nullptr) {
-        vkMapMemory(g_device, result.memory, 0, desc.buffer_size, 0, &result.mapped_data);
+        vkMapMemory(Global::g_device, result.memory, 0, desc.buffer_size, 0, &result.mapped_data);
         memcpy(result.mapped_data, data, (size_t) desc.buffer_size);
-        vkUnmapMemory(g_device, result.memory);
+        vkUnmapMemory(Global::g_device, result.memory);
     }
 
     return result;
@@ -212,26 +176,29 @@ void init_per_frame(int index)
     VkFenceCreateInfo info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    if (vkCreateFence(g_device, &info, nullptr, &g_frame_data[index].fence) == VK_SUCCESS)
+    if (vkCreateFence(Global::g_device, &info, nullptr, &Global::g_frame_data[index].fence)
+        == VK_SUCCESS)
         std::cout << "Fence made" << std::endl;
     else
         std::cout << "Fence failed" << std::endl;
 
     VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    pool_info.queueFamilyIndex = static_cast<uint32_t>(QUEUE_INDEX);
+    pool_info.queueFamilyIndex = static_cast<uint32_t>(Global::QUEUE_INDEX);
 
-    if (vkCreateCommandPool(g_device, &pool_info, nullptr, &g_frame_data[index].pool) == VK_SUCCESS)
+    if (vkCreateCommandPool(Global::g_device, &pool_info, nullptr, &Global::g_frame_data[index].pool)
+        == VK_SUCCESS)
         std::cout << "pool made" << std::endl;
     else
         std::cout << "pool failed" << std::endl;
 
     VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    buf_info.commandPool = g_frame_data[index].pool;
+    buf_info.commandPool = Global::g_frame_data[index].pool;
     buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     buf_info.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(g_device, &buf_info, &g_frame_data[index].buffer) == VK_SUCCESS)
+    if (vkAllocateCommandBuffers(Global::g_device, &buf_info, &Global::g_frame_data[index].buffer)
+        == VK_SUCCESS)
         std::cout << "buffer made" << std::endl;
     else
         std::cout << "buffer failed" << std::endl;
@@ -253,19 +220,19 @@ Texture make_image(TextureDescription desc, Image *image)
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
 
-    vkCreateImage(g_device, &info, nullptr, &result.image);
+    vkCreateImage(Global::g_device, &info, nullptr, &result.image);
 
     VkMemoryRequirements mem_reqs{};
-    vkGetImageMemoryRequirements(g_device, result.image, &mem_reqs);
+    vkGetImageMemoryRequirements(Global::g_device, result.image, &mem_reqs);
 
     VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
     alloc_info.allocationSize = mem_reqs.size;
-    alloc_info.memoryTypeIndex = find_memory_type(g_physical_device,
+    alloc_info.memoryTypeIndex = find_memory_type(Global::g_physical_device,
                                                   mem_reqs.memoryTypeBits,
                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkAllocateMemory(g_device, &alloc_info, nullptr, &result.memory);
-    vkBindImageMemory(g_device, result.image, result.memory, 0);
+    vkAllocateMemory(Global::g_device, &alloc_info, nullptr, &result.memory);
+    vkBindImageMemory(Global::g_device, result.image, result.memory, 0);
 
     VkImageViewCreateInfo create_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     create_info.image = result.image;
@@ -277,7 +244,7 @@ Texture make_image(TextureDescription desc, Image *image)
     create_info.subresourceRange.baseArrayLayer = 0;
     create_info.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(g_device, &create_info, nullptr, &result.view);
+    vkCreateImageView(Global::g_device, &create_info, nullptr, &result.view);
 
     // Staging
     if (image != nullptr) {
@@ -306,10 +273,10 @@ Texture make_image(TextureDescription desc, Image *image)
 
         VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
         pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-        pool_info.queueFamilyIndex = static_cast<uint32_t>(QUEUE_INDEX);
+        pool_info.queueFamilyIndex = static_cast<uint32_t>(Global::QUEUE_INDEX);
 
         VkCommandPool pool;
-        vkCreateCommandPool(g_device, &pool_info, nullptr, &pool);
+        vkCreateCommandPool(Global::g_device, &pool_info, nullptr, &pool);
 
         VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
         buf_info.commandPool = pool;
@@ -317,7 +284,7 @@ Texture make_image(TextureDescription desc, Image *image)
         buf_info.commandBufferCount = 1;
 
         VkCommandBuffer cmd;
-        vkAllocateCommandBuffers(g_device, &buf_info, &cmd);
+        vkAllocateCommandBuffers(Global::g_device, &buf_info, &cmd);
 
         VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
         begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -362,11 +329,11 @@ Texture make_image(TextureDescription desc, Image *image)
         //submit
         VkSemaphore staging_semaphore;
         VkSemaphoreCreateInfo sem_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        vkCreateSemaphore(g_device, &sem_info, nullptr, &staging_semaphore);
+        vkCreateSemaphore(Global::g_device, &sem_info, nullptr, &staging_semaphore);
 
         VkFence staging_fence;
         VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-        vkCreateFence(g_device, &fence_info, nullptr, &staging_fence);
+        vkCreateFence(Global::g_device, &fence_info, nullptr, &staging_fence);
 
         VkSubmitInfo submit_info{VK_STRUCTURE_TYPE_SUBMIT_INFO};
         submit_info.commandBufferCount = 1;
@@ -374,9 +341,9 @@ Texture make_image(TextureDescription desc, Image *image)
         submit_info.signalSemaphoreCount = 1;
         submit_info.pSignalSemaphores = &staging_semaphore;
 
-        vkQueueSubmit(g_queue, 1, &submit_info, staging_fence);
+        vkQueueSubmit(Global::g_queue, 1, &submit_info, staging_fence);
 
-        vkWaitForFences(g_device, 1, &staging_fence, VK_TRUE, UINT64_MAX);
+        vkWaitForFences(Global::g_device, 1, &staging_fence, VK_TRUE, UINT64_MAX);
     }
 
     return result;
@@ -385,22 +352,24 @@ Texture make_image(TextureDescription desc, Image *image)
 void make_swapchain()
 {
     VkSurfaceCapabilitiesKHR surface_properties;
-    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_physical_device, g_surface, &surface_properties)
+    if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Global::g_physical_device,
+                                                  Global::g_surface,
+                                                  &surface_properties)
         == VK_SUCCESS)
         std::cout << "surface capabilities found" << std::endl;
     else
         std::cout << "surface capabilities not found" << std::endl;
 
     VkExtent2D swapchain_size;
-    swapchain_size.width = WIDTH;
-    swapchain_size.height = HEIGHT;
+    swapchain_size.width = Global::WIDTH;
+    swapchain_size.height = Global::HEIGHT;
 
-    uint32_t desired_images = SWAPCHAIN_SIZE; //Assuming more than min
+    uint32_t desired_images = Global::SWAPCHAIN_SIZE; //Assuming more than min
 
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
-    info.surface = g_surface;
+    info.surface = Global::g_surface;
     info.minImageCount = desired_images;
-    info.imageFormat = FORMAT; //Assuming we have this
+    info.imageFormat = Global::FORMAT; //Assuming we have this
     info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     info.imageExtent = swapchain_size;
     info.imageArrayLayers = 1;
@@ -411,16 +380,19 @@ void make_swapchain()
     info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     info.clipped = true;
 
-    if (vkCreateSwapchainKHR(g_device, &info, nullptr, &g_swapchain) == VK_SUCCESS)
+    if (vkCreateSwapchainKHR(Global::g_device, &info, nullptr, &Global::g_swapchain) == VK_SUCCESS)
         std::cout << "Swapchain made" << std::endl;
     else
         std::cout << "Swapchain failed" << std::endl;
 
     uint32_t img_count;
-    vkGetSwapchainImagesKHR(g_device, g_swapchain, &img_count, nullptr);
-    g_swapchain_images.resize(img_count);
-    g_swapchain_views.resize(img_count);
-    vkGetSwapchainImagesKHR(g_device, g_swapchain, &img_count, g_swapchain_images.data());
+    vkGetSwapchainImagesKHR(Global::g_device, Global::g_swapchain, &img_count, nullptr);
+    Global::g_swapchain_images.resize(img_count);
+    Global::g_swapchain_views.resize(img_count);
+    vkGetSwapchainImagesKHR(Global::g_device,
+                            Global::g_swapchain,
+                            &img_count,
+                            Global::g_swapchain_images.data());
 
     for (int i = 0; i < img_count; ++i)
         init_per_frame(i);
@@ -428,16 +400,16 @@ void make_swapchain()
     for (auto i = 0; i < img_count; ++i) {
         VkImageViewCreateInfo view_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         view_info.flags = 0;
-        view_info.image = g_swapchain_images[i];
+        view_info.image = Global::g_swapchain_images[i];
         view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        view_info.format = FORMAT;
+        view_info.format = Global::FORMAT;
         view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         view_info.subresourceRange.baseMipLevel = 0;
         view_info.subresourceRange.levelCount = 1;
         view_info.subresourceRange.baseArrayLayer = 0;
         view_info.subresourceRange.layerCount = 1;
 
-        vkCreateImageView(g_device, &view_info, nullptr, &g_swapchain_views[i]);
+        vkCreateImageView(Global::g_device, &view_info, nullptr, &Global::g_swapchain_views[i]);
     }
 }
 
@@ -450,12 +422,12 @@ void make_pipeline()
 
     VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     layout_info.setLayoutCount = 1;
-    layout_info.pSetLayouts = &g_descriptor_layout;
+    layout_info.pSetLayouts = &Global::g_descriptor_layout;
 
     layout_info.pushConstantRangeCount = 1;
     layout_info.pPushConstantRanges = &range;
 
-    vkCreatePipelineLayout(g_device, &layout_info, nullptr, &g_pipeline_layout);
+    vkCreatePipelineLayout(Global::g_device, &layout_info, nullptr, &Global::g_pipeline_layout);
 
     VkVertexInputBindingDescription binding_desc{};
     binding_desc.binding = 0;
@@ -543,8 +515,8 @@ void make_pipeline()
 
     VkPipelineRenderingCreateInfo rendering_info{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
     rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachmentFormats = &FORMAT;
-    rendering_info.depthAttachmentFormat = DEPTH_FORMAT;
+    rendering_info.pColorAttachmentFormats = &Global::FORMAT;
+    rendering_info.depthAttachmentFormat = Global::DEPTH_FORMAT;
 
     VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
     info.pNext = &rendering_info;
@@ -558,11 +530,16 @@ void make_pipeline()
     info.pDepthStencilState = &depth_stencil_state;
     info.pColorBlendState = &blend_state_info;
     info.pDynamicState = &dynamic_state_info;
-    info.layout = g_pipeline_layout;
+    info.layout = Global::g_pipeline_layout;
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
 
-    if (vkCreateGraphicsPipelines(g_device, VK_NULL_HANDLE, 1, &info, nullptr, &g_pipeline)
+    if (vkCreateGraphicsPipelines(Global::g_device,
+                                  VK_NULL_HANDLE,
+                                  1,
+                                  &info,
+                                  nullptr,
+                                  &Global::g_pipeline)
         == VK_SUCCESS)
         std::cout << "pipeline made" << std::endl;
     else
@@ -578,7 +555,7 @@ void make_descriptor()
     binding.descriptorCount = 1;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    binding.pImmutableSamplers = &g_sampler;
+    binding.pImmutableSamplers = &Global::g_sampler;
 
     VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     info.flags
@@ -586,14 +563,14 @@ void make_descriptor()
     info.bindingCount = 1;
     info.pBindings = &binding;
 
-    vkCreateDescriptorSetLayout(g_device, &info, nullptr, &g_descriptor_layout);
+    vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &Global::g_descriptor_layout);
 }
 
 void make_sampler()
 {
     VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
 
-    vkCreateSampler(g_device, &info, nullptr, &g_sampler);
+    vkCreateSampler(Global::g_device, &info, nullptr, &Global::g_sampler);
 }
 
 void transition_image_layout(VkCommandBuffer cmd,
@@ -634,7 +611,7 @@ void render(uint32_t img, std::vector<NativeModel> models)
 {
     static uint32_t frame = 0;
 
-    auto cmd = g_frame_data[img].buffer;
+    auto cmd = Global::g_frame_data[img].buffer;
 
     VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -642,7 +619,7 @@ void render(uint32_t img, std::vector<NativeModel> models)
     vkBeginCommandBuffer(cmd, &begin_info);
 
     transition_image_layout(cmd,
-                            g_swapchain_images[img],
+                            Global::g_swapchain_images[img],
                             VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
@@ -656,14 +633,14 @@ void render(uint32_t img, std::vector<NativeModel> models)
     depth_clear_value.depthStencil = {1, 0};
 
     VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    color_attachment.imageView = g_swapchain_views[img];
+    color_attachment.imageView = Global::g_swapchain_views[img];
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     color_attachment.clearValue = clear_color_value;
 
     VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    depth_attachment.imageView = g_depth.view;
+    depth_attachment.imageView = Global::g_depth.view;
     depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
     depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -671,8 +648,8 @@ void render(uint32_t img, std::vector<NativeModel> models)
 
     VkRenderingInfo rendering_info{VK_STRUCTURE_TYPE_RENDERING_INFO};
     rendering_info.renderArea.offset = {0, 0};
-    rendering_info.renderArea.extent.width = WIDTH;
-    rendering_info.renderArea.extent.height = HEIGHT;
+    rendering_info.renderArea.extent.width = Global::WIDTH;
+    rendering_info.renderArea.extent.height = Global::HEIGHT;
     rendering_info.layerCount = 1;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments = &color_attachment;
@@ -680,44 +657,50 @@ void render(uint32_t img, std::vector<NativeModel> models)
 
     vkCmdBeginRendering(cmd, &rendering_info);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_pipeline);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Global::g_pipeline);
 
     VkViewport vp{};
     vp.x = 0;
-    vp.y = static_cast<float>(HEIGHT);
-    vp.width = static_cast<float>(WIDTH);
-    vp.height = -static_cast<float>(HEIGHT); // Flip viewport for Y up
+    vp.y = static_cast<float>(Global::HEIGHT);
+    vp.width = static_cast<float>(Global::WIDTH);
+    vp.height = -static_cast<float>(Global::HEIGHT); // Flip viewport for Y up
     vp.minDepth = 0.0f;
     vp.maxDepth = 1.0f;
 
     vkCmdSetViewport(cmd, 0, 1, &vp);
 
     VkRect2D scissor{};
-    scissor.extent.width = WIDTH;
-    scissor.extent.height = HEIGHT;
+    scissor.extent.width = Global::WIDTH;
+    scissor.extent.height = Global::HEIGHT;
 
     vkCmdSetScissor(cmd, 0, 1, &scissor);
     vkCmdSetCullMode(cmd, VK_CULL_MODE_BACK_BIT);
 
-    auto modelT = g_model;
-
     for (auto &model : models) {
         // updates go here
 
-        g_view = glm::lookAt(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-        g_constants = {modelT,
-                       g_view,
-                       g_projection,
-                       glm::vec4(g_camera_position.x, g_camera_position.y, g_camera_position.z, 0),
-                       frame};
+        Global::g_view = glm::lookAt(Global::g_camera_position,
+                                     glm::vec3(0, 0, 0),
+                                     glm::vec3(0, 1, 0));
+        Global::g_constants = {glm::translate(glm::mat4(1.0f),
+                                              glm::vec3(model.position.x,
+                                                        model.position.y,
+                                                        model.position.z)),
+                               Global::g_view,
+                               Global::g_projection,
+                               glm::vec4(Global::g_camera_position.x,
+                                         Global::g_camera_position.y,
+                                         Global::g_camera_position.z,
+                                         0),
+                               frame};
         //
 
         vkCmdPushConstants(cmd,
-                           g_pipeline_layout,
+                           Global::g_pipeline_layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                            0,
                            sizeof(UniformConstants),
-                           &g_constants);
+                           &Global::g_constants);
 
         VkDeviceSize offset{0};
         vkCmdBindVertexBuffers(cmd, 0, 1, &model.vertex.buffer, &offset);
@@ -736,19 +719,17 @@ void render(uint32_t img, std::vector<NativeModel> models)
 
         vkCmdPushDescriptorSet(cmd,
                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                               g_pipeline_layout,
+                               Global::g_pipeline_layout,
                                0,
                                1,
                                &write_set);
 
         vkCmdDrawIndexed(cmd, model.index_count, 1, 0, 0, 0);
-
-        modelT = glm::translate(modelT, glm::vec3(0, 0, 3));
     }
     vkCmdEndRendering(cmd);
 
     transition_image_layout(cmd,
-                            g_swapchain_images[img],
+                            Global::g_swapchain_images[img],
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                             VK_IMAGE_ASPECT_COLOR_BIT,
@@ -759,23 +740,26 @@ void render(uint32_t img, std::vector<NativeModel> models)
 
     vkEndCommandBuffer(cmd);
 
-    if (g_frame_data[img].releaseSemaphore == VK_NULL_HANDLE) {
+    if (Global::g_frame_data[img].releaseSemaphore == VK_NULL_HANDLE) {
         VkSemaphoreCreateInfo sem_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        vkCreateSemaphore(g_device, &sem_info, nullptr, &g_frame_data[img].releaseSemaphore);
+        vkCreateSemaphore(Global::g_device,
+                          &sem_info,
+                          nullptr,
+                          &Global::g_frame_data[img].releaseSemaphore);
     }
 
     VkPipelineStageFlags wait_stage{VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT};
 
     VkSubmitInfo sub_info{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     sub_info.waitSemaphoreCount = 1;
-    sub_info.pWaitSemaphores = &g_frame_data[img].acquireSemaphore;
+    sub_info.pWaitSemaphores = &Global::g_frame_data[img].acquireSemaphore;
     sub_info.pWaitDstStageMask = &wait_stage;
     sub_info.commandBufferCount = 1;
     sub_info.pCommandBuffers = &cmd;
     sub_info.signalSemaphoreCount = 1;
-    sub_info.pSignalSemaphores = &g_frame_data[img].releaseSemaphore;
+    sub_info.pSignalSemaphores = &Global::g_frame_data[img].releaseSemaphore;
 
-    vkQueueSubmit(g_queue, 1, &sub_info, g_frame_data[img].fence);
+    vkQueueSubmit(Global::g_queue, 1, &sub_info, Global::g_frame_data[img].fence);
 
     frame++;
 }
@@ -784,47 +768,51 @@ VkResult present_image(uint32_t index)
 {
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &g_frame_data[index].releaseSemaphore;
+    present.pWaitSemaphores = &Global::g_frame_data[index].releaseSemaphore;
     present.swapchainCount = 1;
-    present.pSwapchains = &g_swapchain;
+    present.pSwapchains = &Global::g_swapchain;
     present.pImageIndices = &index;
 
-    return vkQueuePresentKHR(g_queue, &present);
+    return vkQueuePresentKHR(Global::g_queue, &present);
 }
 
 VkResult acquire_swapchain_image(uint32_t *img)
 {
     VkSemaphore semaphore;
 
-    if (g_semaphores.empty()) {
+    if (Global::g_semaphores.empty()) {
         VkSemaphoreCreateInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        vkCreateSemaphore(g_device, &info, nullptr, &semaphore);
+        vkCreateSemaphore(Global::g_device, &info, nullptr, &semaphore);
     } else {
-        semaphore = g_semaphores.back();
-        g_semaphores.pop_back();
+        semaphore = Global::g_semaphores.back();
+        Global::g_semaphores.pop_back();
     }
 
-    auto res
-        = vkAcquireNextImageKHR(g_device, g_swapchain, UINT64_MAX, semaphore, VK_NULL_HANDLE, img);
+    auto res = vkAcquireNextImageKHR(Global::g_device,
+                                     Global::g_swapchain,
+                                     UINT64_MAX,
+                                     semaphore,
+                                     VK_NULL_HANDLE,
+                                     img);
 
     if (res != VK_SUCCESS) {
-        g_semaphores.push_back(semaphore);
+        Global::g_semaphores.push_back(semaphore);
         return res;
     }
 
-    if (g_frame_data[*img].fence != VK_NULL_HANDLE) {
-        vkWaitForFences(g_device, 1, &g_frame_data[*img].fence, true, UINT64_MAX);
-        vkResetFences(g_device, 1, &g_frame_data[*img].fence);
+    if (Global::g_frame_data[*img].fence != VK_NULL_HANDLE) {
+        vkWaitForFences(Global::g_device, 1, &Global::g_frame_data[*img].fence, true, UINT64_MAX);
+        vkResetFences(Global::g_device, 1, &Global::g_frame_data[*img].fence);
     }
 
-    if (g_frame_data[*img].pool != VK_NULL_HANDLE) {
-        vkResetCommandPool(g_device, g_frame_data[*img].pool, 0);
+    if (Global::g_frame_data[*img].pool != VK_NULL_HANDLE) {
+        vkResetCommandPool(Global::g_device, Global::g_frame_data[*img].pool, 0);
     }
 
-    auto used_semaphore = g_frame_data[*img].acquireSemaphore;
+    auto used_semaphore = Global::g_frame_data[*img].acquireSemaphore;
     if (used_semaphore != VK_NULL_HANDLE)
-        g_semaphores.push_back(used_semaphore);
-    g_frame_data[*img].acquireSemaphore = semaphore;
+        Global::g_semaphores.push_back(used_semaphore);
+    Global::g_frame_data[*img].acquireSemaphore = semaphore;
 
     return res;
 }
@@ -846,138 +834,4 @@ NativeModel make_native_model(Model &model)
                                 &model.material.textures[0]);
 
     return {vbuffer, ibuffer, model_tex, static_cast<uint32_t>(model.mesh.indices.size())};
-}
-
-int g_main()
-{
-    if (!glfwInit())
-        std::cout << "Issues!";
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_DECORATED, GL_TRUE);
-
-    auto *w = glfwCreateWindow(WIDTH, HEIGHT, "Orbital", NULL, NULL);
-
-    if (!w)
-        throw;
-
-    make_instance();
-    make_device();
-
-    if (auto res = glfwCreateWindowSurface(g_instance, w, nullptr, &g_surface); res == VK_SUCCESS)
-        std::cout << "Surface creation good" << std::endl;
-    else
-        std::cout << "Surface creation failed " << res << std::endl;
-
-    make_swapchain();
-
-    g_depth = make_image({WIDTH,
-                          HEIGHT,
-                          DEPTH_FORMAT,
-                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                          VK_IMAGE_ASPECT_DEPTH_BIT});
-
-    make_sampler();
-    make_descriptor();
-    make_pipeline();
-
-    glfwMakeContextCurrent(w);
-
-    glfwShowWindow(w);
-
-    struct WindowState
-    {
-        bool new_click;
-        bool is_pressed;
-        double x_delta = 0.0;
-        double y_delta = 0.0;
-        double camera_distance = g_camera_position.z;
-    } state;
-
-    glfwSetWindowUserPointer(w, &state);
-
-    glfwSetMouseButtonCallback(w, [](GLFWwindow *window, int button, int action, int mods) {
-        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
-
-        if (button == GLFW_MOUSE_BUTTON_LEFT) {
-            if (action == GLFW_PRESS) {
-                state->is_pressed = true;
-                state->new_click = true;
-            } else if (action == GLFW_RELEASE) {
-                state->is_pressed = false;
-            }
-        }
-    });
-
-    glfwSetCursorPosCallback(w, [](GLFWwindow *window, double xpos, double ypos) {
-        static double last_x_position = xpos, last_y_position = ypos;
-
-        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
-
-        if (!state->is_pressed)
-            return;
-
-        if (state->new_click) {
-            last_x_position = xpos;
-            last_y_position = ypos;
-            state->new_click = false;
-        }
-
-        state->x_delta -= xpos - last_x_position;
-        state->y_delta += ypos - last_y_position;
-        state->y_delta = glm::clamp(state->y_delta, -130.0 + 0.01, 130.0 - 0.01);
-
-        g_camera_position = glm::vec3(state->camera_distance
-                                          * (glm::sin(state->x_delta * 0.01)
-                                             * glm::cos(state->y_delta * 0.01)),
-                                      state->camera_distance * (glm::sin(state->y_delta * 0.01)),
-                                      state->camera_distance
-                                          * (glm::cos(state->x_delta * 0.01)
-                                             * glm::cos(state->y_delta * 0.01)));
-
-        last_x_position = xpos;
-        last_y_position = ypos;
-    });
-
-    glfwSetScrollCallback(w, [](GLFWwindow *window, double xoffset, double yoffset) {
-        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
-
-        state->camera_distance -= yoffset * 0.2;
-
-        g_camera_position = glm::vec3(state->camera_distance
-                                          * (glm::sin(state->x_delta * 0.01)
-                                             * glm::cos(state->y_delta * 0.01)),
-                                      state->camera_distance * (glm::sin(state->y_delta * 0.01)),
-                                      state->camera_distance
-                                          * (glm::cos(state->x_delta * 0.01)
-                                             * glm::cos(state->y_delta * 0.01)));
-    });
-
-    // ===== Load assets ======
-
-    auto earth_asset = MeshLoader::load_model(ROOT "assets/earth.glb");
-    auto monkey_asset = MeshLoader::load_model(ROOT "assets/monkey.glb");
-
-    auto monkey = make_native_model(monkey_asset);
-    auto earth = make_native_model(earth_asset);
-
-    // ========================
-
-    while (!glfwWindowShouldClose(w)) {
-        uint32_t frame;
-        auto r = acquire_swapchain_image(&frame);
-
-        if (r != VK_SUCCESS) {
-            vkQueueWaitIdle(g_queue);
-            continue;
-        }
-
-        render(frame, {earth, monkey});
-        present_image(frame);
-
-        glfwSwapBuffers(w);
-        glfwPollEvents();
-    }
-
-    return 0;
 }

@@ -74,6 +74,7 @@ struct NativeModel
     Buffer index;
     Texture texture;
     uint32_t index_count;
+    vec3 position = {0, 0, 0};
 };
 
 uint32_t find_memory_type(VkPhysicalDevice phy_device,
@@ -117,7 +118,5 @@ VkResult present_image(uint32_t index);
 VkResult acquire_swapchain_image(uint32_t *img);
 
 NativeModel make_native_model(Model &model);
-
-int g_main();
 
 #endif // GRAPHICS_H
