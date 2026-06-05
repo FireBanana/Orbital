@@ -95,12 +95,6 @@ Texture make_image(TextureDescription desc, Image *image = nullptr);
 
 void make_swapchain();
 
-void make_pipeline();
-
-void make_descriptor();
-
-void make_sampler();
-
 void transition_image_layout(VkCommandBuffer cmd,
                              VkImage img,
                              VkImageLayout oldLayout,
@@ -118,5 +112,7 @@ VkResult present_image(uint32_t index);
 VkResult acquire_swapchain_image(uint32_t *img);
 
 NativeModel make_native_model(Model &model);
+
+void begin_render_loop(std::vector<NativeModel> &renderables);
 
 #endif // GRAPHICS_H

@@ -3,6 +3,9 @@
 
 #include "graphics.h"
 
+#include <atomic>
+#include <thread>
+
 // C++17 inline variables
 namespace Global {
 constexpr uint32_t QUEUE_INDEX = 0;
@@ -12,6 +15,8 @@ constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_SRGB;
 constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
 constexpr uint32_t SWAPCHAIN_SIZE = 3;
 constexpr uint32_t FRAMES_IN_FLIGHT = 2;
+
+inline GLFWwindow *g_window;
 
 inline VkInstance g_instance;
 inline VkPhysicalDevice g_physical_device;
@@ -41,6 +46,10 @@ inline Texture g_depth;
 // Per frame data
 inline std::vector<VkSemaphore> g_semaphores;
 inline std::array<Frame, SWAPCHAIN_SIZE> g_frame_data{};
+
+inline std::thread g_gui_thread;
+inline std::atomic<bool> g_window_running = true;
+
 }; // namespace Global
 
 #endif // GLOBAL_H

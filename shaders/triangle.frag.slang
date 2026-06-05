@@ -21,10 +21,7 @@ static float3 g_light_dir = {-0.8, -1.0, 3.0};
 UniformConstants state;
 
 [[vk::binding(0, 0)]]
-Texture2D<float4> diffuse_texture;
-
-[[vk::binding(0, 0)]]
-SamplerState diffuse_sampler;
+Sampler2D diffuse_texture;
 
 float schlick(float3 normal, float3 pos)
 {
@@ -47,6 +44,6 @@ float4 main(VSOutput input)
     light /= 3.142;
     float ambient = 30.;
 
-    float4 color = diffuse_texture.Sample(diffuse_sampler, input.Uv);
+    float4 color = diffuse_texture.Sample(input.Uv);
     return float4(color.rgb * light + ambient * schlick(input.Normal, input.WorldPos.xyz), 1.0);
 }
