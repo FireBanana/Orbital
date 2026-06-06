@@ -7,7 +7,10 @@ namespace ui_pipeline {
 inline void create_pipeline()
 {
     VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    vkCreatePipelineLayout(Global::g_device, &layout_info, nullptr, &Global::g_pipeline_layout);
+    vkCreatePipelineLayout(Global::g_device,
+                           &layout_info,
+                           nullptr,
+                           &Global::g_pipelines[1].pipeline_layout);
 
     VkVertexInputBindingDescription binding_desc{};
     binding_desc.binding = 0;
@@ -105,7 +108,7 @@ inline void create_pipeline()
     info.pDepthStencilState = &depth_stencil_state;
     info.pColorBlendState = &blend_state_info;
     info.pDynamicState = &dynamic_state_info;
-    info.layout = Global::g_pipeline_layout;
+    info.layout = Global::g_pipelines[1].pipeline_layout;
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
 
@@ -114,7 +117,7 @@ inline void create_pipeline()
                               1,
                               &info,
                               nullptr,
-                              &Global::g_pipeline);
+                              &Global::g_pipelines[1].pipeline);
 
     //delete shader modules
 }

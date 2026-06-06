@@ -8,7 +8,7 @@ namespace forward_pipeline {
 inline void create_sampler()
 {
     VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-    vkCreateSampler(Global::g_device, &info, nullptr, &Global::g_sampler);
+    vkCreateSampler(Global::g_device, &info, nullptr, &Global::g_pipelines[0].sampler);
 }
 
 inline void create_descriptor()
@@ -18,7 +18,7 @@ inline void create_descriptor()
     binding.descriptorCount = 1;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    binding.pImmutableSamplers = &Global::g_sampler;
+    binding.pImmutableSamplers = &Global::g_pipelines[0].sampler;
 
     VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     info.flags
@@ -26,7 +26,10 @@ inline void create_descriptor()
     info.bindingCount = 1;
     info.pBindings = &binding;
 
-    vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &Global::g_descriptor_layout);
+    vkCreateDescriptorSetLayout(Global::g_device,
+                                &info,
+                                nullptr,
+                                &Global::g_pipelines[0].descriptor_layout);
 }
 
 inline void create_pipeline()
@@ -38,12 +41,15 @@ inline void create_pipeline()
 
     VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     layout_info.setLayoutCount = 1;
-    layout_info.pSetLayouts = &Global::g_descriptor_layout;
+    layout_info.pSetLayouts = &Global::g_pipelines[0].descriptor_layout;
 
     layout_info.pushConstantRangeCount = 1;
     layout_info.pPushConstantRanges = &range;
 
-    vkCreatePipelineLayout(Global::g_device, &layout_info, nullptr, &Global::g_pipeline_layout);
+    vkCreatePipelineLayout(Global::g_device,
+                           &layout_info,
+                           nullptr,
+                           &Global::g_pipelines[0].pipeline_layout);
 
     VkVertexInputBindingDescription binding_desc{};
     binding_desc.binding = 0;
@@ -146,7 +152,7 @@ inline void create_pipeline()
     info.pDepthStencilState = &depth_stencil_state;
     info.pColorBlendState = &blend_state_info;
     info.pDynamicState = &dynamic_state_info;
-    info.layout = Global::g_pipeline_layout;
+    info.layout = Global::g_pipelines[0].pipeline_layout;
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
 
@@ -155,7 +161,7 @@ inline void create_pipeline()
                               1,
                               &info,
                               nullptr,
-                              &Global::g_pipeline);
+                              &Global::g_pipelines[0].pipeline);
 
     //delete shader modules
 }

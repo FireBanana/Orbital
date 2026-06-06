@@ -496,7 +496,7 @@ void render(uint32_t img, std::vector<NativeModel> models)
 
     vkCmdBeginRendering(cmd, &rendering_info);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Global::g_pipeline);
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Global::g_pipelines[0].pipeline);
 
     VkViewport vp{};
     vp.x = 0;
@@ -535,7 +535,7 @@ void render(uint32_t img, std::vector<NativeModel> models)
         //
 
         vkCmdPushConstants(cmd,
-                           Global::g_pipeline_layout,
+                           Global::g_pipelines[0].pipeline_layout,
                            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                            0,
                            sizeof(UniformConstants),
@@ -558,7 +558,7 @@ void render(uint32_t img, std::vector<NativeModel> models)
 
         vkCmdPushDescriptorSet(cmd,
                                VK_PIPELINE_BIND_POINT_GRAPHICS,
-                               Global::g_pipeline_layout,
+                               Global::g_pipelines[0].pipeline_layout,
                                0,
                                1,
                                &write_set);

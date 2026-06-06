@@ -112,9 +112,13 @@ int main()
                             * (glm::cos(state->x_delta * 0.01) * glm::cos(state->y_delta * 0.01)));
     });
 
+    Global::g_pipelines.push_back({});
     forward_pipeline::create_sampler();
     forward_pipeline::create_descriptor();
     forward_pipeline::create_pipeline();
+
+    Global::g_pipelines.push_back({});
+    ui_pipeline::create_pipeline();
 
     // ===== Load assets ======
 
