@@ -17,34 +17,34 @@ inline void create_pipeline()
     binding_desc.stride = sizeof(vertex);
     binding_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    struct line_vertex
-    {
-        vec3 position;
-    };
+    // struct line_vertex
+    // {
+    //     vec3 position;
+    // };
 
-    std::array<VkVertexInputAttributeDescription, 1> attr_description = {
-        {{.location = 0,
-          .binding = 0,
-          .format = VK_FORMAT_R32G32B32_SFLOAT,
-          .offset = offsetof(line_vertex, position)}}};
+    // std::array<VkVertexInputAttributeDescription, 1> attr_description = {
+    //     {{.location = 0,
+    //       .binding = 0,
+    //       .format = VK_FORMAT_R32G32B32_SFLOAT,
+    //       .offset = offsetof(line_vertex, position)}}};
 
     VkPipelineVertexInputStateCreateInfo vertex_state_info{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-    vertex_state_info.vertexBindingDescriptionCount = 1;
-    vertex_state_info.vertexAttributeDescriptionCount = (uint32_t) attr_description.size();
-    vertex_state_info.pVertexBindingDescriptions = &binding_desc;
-    vertex_state_info.pVertexAttributeDescriptions = attr_description.data();
+    vertex_state_info.vertexBindingDescriptionCount = 0;
+    // vertex_state_info.vertexAttributeDescriptionCount = (uint32_t) attr_description.size();
+    // vertex_state_info.pVertexBindingDescriptions = &binding_desc;
+    // vertex_state_info.pVertexAttributeDescriptions = attr_description.data();
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-    input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
     input_assembly.primitiveRestartEnable = false;
 
     VkPipelineRasterizationStateCreateInfo raster_info{
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
     raster_info.depthClampEnable = false;
     raster_info.rasterizerDiscardEnable = false;
-    raster_info.polygonMode = VK_POLYGON_MODE_LINE;
+    raster_info.polygonMode = VK_POLYGON_MODE_FILL;
     raster_info.depthBiasEnable = false;
     raster_info.lineWidth = 1.0;
 
@@ -68,9 +68,8 @@ inline void create_pipeline()
 
     VkPipelineDepthStencilStateCreateInfo depth_stencil_state{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-    depth_stencil_state.depthTestEnable = VK_TRUE;
-    depth_stencil_state.depthWriteEnable = VK_TRUE;
+    depth_stencil_state.depthTestEnable = VK_FALSE;
+    depth_stencil_state.depthWriteEnable = VK_FALSE;
 
     VkPipelineMultisampleStateCreateInfo multisample_state{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};

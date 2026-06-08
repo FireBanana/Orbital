@@ -99,8 +99,13 @@ void make_device()
                                 "VK_KHR_dynamic_rendering",
                                 "VK_EXT_descriptor_buffer"};
 
+    VkPhysicalDeviceVulkan11Features enable_vulkan11_features
+        = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+           .shaderDrawParameters = VK_TRUE};
+
     VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_features{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
+        .pNext = &enable_vulkan11_features,
         .descriptorBuffer = VK_TRUE};
 
     VkPhysicalDeviceVulkan13Features enable_vulkan13_features = {
@@ -515,6 +520,7 @@ void render(uint32_t img, std::vector<NativeModel> models)
     vkCmdSetScissor(cmd, 0, 1, &scissor);
     vkCmdSetCullMode(cmd, VK_CULL_MODE_BACK_BIT);
 
+    //forward pass
     for (auto &model : models) {
         // updates go here
 
@@ -563,9 +569,13 @@ void render(uint32_t img, std::vector<NativeModel> models)
                                1,
                                &write_set);
 
-        vkCmdSetLineStipple(cmd, 1, 1);
         vkCmdDrawIndexed(cmd, model.index_count, 1, 0, 0, 0);
     }
+
+    // ui pass
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Global::g_pipelines[1].pipeline);
+    vkCmdDraw(cmd, 5, 1, 0, 0);
+
     vkCmdEndRendering(cmd);
 
     transition_image_layout(cmd,
