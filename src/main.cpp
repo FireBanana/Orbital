@@ -1,7 +1,7 @@
 #include "global.h"
 #include "graphics.h"
-#include "pipelines/forward_pipeline.h"
-#include "pipelines/ui_pipeline.h"
+#include "passes/forward_pass.h"
+#include "passes/gui_pass.h"
 #include <iostream>
 #include <random>
 
@@ -112,13 +112,8 @@ int main()
                             * (glm::cos(state->x_delta * 0.01) * glm::cos(state->y_delta * 0.01)));
     });
 
-    Global::g_pipelines.push_back({});
-    forward_pipeline::create_sampler();
-    forward_pipeline::create_descriptor();
-    forward_pipeline::create_pipeline();
-
-    Global::g_pipelines.push_back({});
-    ui_pipeline::create_pipeline();
+    ForwardPass f_pass{};
+    GuiPass g_pass{};
 
     // ===== Load assets ======
 
@@ -130,9 +125,12 @@ int main()
 
     std::vector<NativeModel> renderables{50, earth};
 
-    // ========================
+    f_pass.attach_models(&renderables);
 
-    begin_render_loop(renderables);
+    // ========================
+    std::vector<Pass *> passes = {&f_pass, &g_pass};
+
+    begin_render_loop(passes);
 
     constexpr double min_distance = 3.0, max_distance = 10.0;
     constexpr double min_speed = 0.0001, max_speed = 0.000001;

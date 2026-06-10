@@ -1,16 +1,22 @@
-#ifndef UI_PIPELINE_H
-#define UI_PIPELINE_H
-
+#include "gui_pass.h"
 #include "../global.h"
 #include "../graphics.h"
-namespace ui_pipeline {
-inline void create_pipeline()
+
+GuiPass::GuiPass()
+{
+    create_pipeline();
+}
+
+void GuiPass::render(VkCommandBuffer *cmd)
+{
+    vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    vkCmdDraw(*cmd, 5, 1, 0, 0);
+}
+
+void GuiPass::create_pipeline()
 {
     VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    vkCreatePipelineLayout(Global::g_device,
-                           &layout_info,
-                           nullptr,
-                           &Global::g_pipelines[1].pipeline_layout);
+    vkCreatePipelineLayout(Global::g_device, &layout_info, nullptr, &m_pipelineLayout);
 
     VkVertexInputBindingDescription binding_desc{};
     binding_desc.binding = 0;
@@ -107,19 +113,11 @@ inline void create_pipeline()
     info.pDepthStencilState = &depth_stencil_state;
     info.pColorBlendState = &blend_state_info;
     info.pDynamicState = &dynamic_state_info;
-    info.layout = Global::g_pipelines[1].pipeline_layout;
+    info.layout = m_pipelineLayout;
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
 
-    vkCreateGraphicsPipelines(Global::g_device,
-                              VK_NULL_HANDLE,
-                              1,
-                              &info,
-                              nullptr,
-                              &Global::g_pipelines[1].pipeline);
+    vkCreateGraphicsPipelines(Global::g_device, VK_NULL_HANDLE, 1, &info, nullptr, &m_pipeline);
 
     //delete shader modules
 }
-} // namespace ui_pipeline
-
-#endif // UI_PIPELINE_H

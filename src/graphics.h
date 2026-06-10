@@ -12,6 +12,8 @@
 #include <string>
 #include <vulkan/vulkan_core.h>
 
+class Pass;
+
 struct Frame
 {
     VkFence fence;
@@ -105,7 +107,7 @@ void transition_image_layout(VkCommandBuffer cmd,
                              VkPipelineStageFlags2 srcStage,
                              VkPipelineStageFlags2 dstStage);
 
-void render(uint32_t img, std::vector<NativeModel> models);
+void render(uint32_t img, std::vector<Pass *> passes);
 
 VkResult present_image(uint32_t index);
 
@@ -113,6 +115,6 @@ VkResult acquire_swapchain_image(uint32_t *img);
 
 NativeModel make_native_model(Model &model);
 
-void begin_render_loop(std::vector<NativeModel> &renderables);
+void begin_render_loop(std::vector<Pass *> &passes);
 
 #endif // GRAPHICS_H

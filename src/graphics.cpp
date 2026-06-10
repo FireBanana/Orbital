@@ -1,5 +1,6 @@
 #include "graphics.h"
 #include "global.h"
+#include "passes/pass.h"
 #include <array>
 #include <cstring>
 #include <fstream>
@@ -451,10 +452,8 @@ void transition_image_layout(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void render(uint32_t img, std::vector<NativeModel> models)
+void render(uint32_t img, std::vector<Pass *> passes)
 {
-    static uint32_t frame = 0;
-
     auto cmd = Global::g_frame_data[img].buffer;
 
     VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
@@ -501,80 +500,8 @@ void render(uint32_t img, std::vector<NativeModel> models)
 
     vkCmdBeginRendering(cmd, &rendering_info);
 
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Global::g_pipelines[0].pipeline);
-
-    VkViewport vp{};
-    vp.x = 0;
-    vp.y = static_cast<float>(Global::HEIGHT);
-    vp.width = static_cast<float>(Global::WIDTH);
-    vp.height = -static_cast<float>(Global::HEIGHT); // Flip viewport for Y up
-    vp.minDepth = 0.0f;
-    vp.maxDepth = 1.0f;
-
-    vkCmdSetViewport(cmd, 0, 1, &vp);
-
-    VkRect2D scissor{};
-    scissor.extent.width = Global::WIDTH;
-    scissor.extent.height = Global::HEIGHT;
-
-    vkCmdSetScissor(cmd, 0, 1, &scissor);
-    vkCmdSetCullMode(cmd, VK_CULL_MODE_BACK_BIT);
-
-    //forward pass
-    for (auto &model : models) {
-        // updates go here
-
-        Global::g_view = glm::lookAt(Global::g_camera_position,
-                                     glm::vec3(0, 0, 0),
-                                     glm::vec3(0, 1, 0));
-        Global::g_constants = {glm::translate(glm::mat4(1.0f),
-                                              glm::vec3(model.position.x,
-                                                        model.position.y,
-                                                        model.position.z)),
-                               Global::g_view,
-                               Global::g_projection,
-                               glm::vec4(Global::g_camera_position.x,
-                                         Global::g_camera_position.y,
-                                         Global::g_camera_position.z,
-                                         0),
-                               frame};
-        //
-
-        vkCmdPushConstants(cmd,
-                           Global::g_pipelines[0].pipeline_layout,
-                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                           0,
-                           sizeof(UniformConstants),
-                           &Global::g_constants);
-
-        VkDeviceSize offset{0};
-        vkCmdBindVertexBuffers(cmd, 0, 1, &model.vertex.buffer, &offset);
-        vkCmdBindIndexBuffer(cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT16);
-
-        VkDescriptorImageInfo image_info{};
-        image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        image_info.imageView = model.texture.view;
-        image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
-
-        VkWriteDescriptorSet write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-        write_set.dstBinding = 0;
-        write_set.descriptorCount = 1;
-        write_set.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        write_set.pImageInfo = &image_info;
-
-        vkCmdPushDescriptorSet(cmd,
-                               VK_PIPELINE_BIND_POINT_GRAPHICS,
-                               Global::g_pipelines[0].pipeline_layout,
-                               0,
-                               1,
-                               &write_set);
-
-        vkCmdDrawIndexed(cmd, model.index_count, 1, 0, 0, 0);
-    }
-
-    // ui pass
-    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, Global::g_pipelines[1].pipeline);
-    vkCmdDraw(cmd, 5, 1, 0, 0);
+    for (auto &pass : passes)
+        pass->render(&cmd);
 
     vkCmdEndRendering(cmd);
 
@@ -610,8 +537,6 @@ void render(uint32_t img, std::vector<NativeModel> models)
     sub_info.pSignalSemaphores = &Global::g_frame_data[img].releaseSemaphore;
 
     vkQueueSubmit(Global::g_queue, 1, &sub_info, Global::g_frame_data[img].fence);
-
-    frame++;
 }
 
 VkResult present_image(uint32_t index)
@@ -686,7 +611,7 @@ NativeModel make_native_model(Model &model)
     return {vbuffer, ibuffer, model_tex, static_cast<uint32_t>(model.mesh.indices.size())};
 }
 
-void begin_render_loop(std::vector<NativeModel> &renderables)
+void begin_render_loop(std::vector<Pass *> &pass)
 {
     Global::g_gui_thread = std::thread([&]() {
         while (!glfwWindowShouldClose(Global::g_window)) {
@@ -698,7 +623,7 @@ void begin_render_loop(std::vector<NativeModel> &renderables)
                 continue;
             }
 
-            render(frame, renderables);
+            render(frame, pass);
             present_image(frame);
 
             glfwSwapBuffers(Global::g_window);

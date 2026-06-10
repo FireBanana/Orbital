@@ -37,9 +37,6 @@ float schlick(float3 normal, float3 pos)
 [shader("fragment")]
 float4 main(VSOutput input)
 {
-    //g_light_dir.x *= sin(state.frame * 0.01);
-    //g_light_dir.z *= cos(state.frame * 0.01);
-
     float3 light = max(dot(normalize(g_light_dir), normalize(input.Normal)), float3(0.));
     light /= 3.142;
     float ambient = 30.;

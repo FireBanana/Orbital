@@ -23,8 +23,10 @@ add_executable(Orbital src/main.cpp src/mesh_loader.h src/mesh_loader.cpp shader
     src/graphics.h src/graphics.cpp external/stb_image.h
     src/types.h
     src/global.h
-    src/pipelines/forward_pipeline.h
-    src/pipelines/ui_pipeline.h
+
+    src/passes/pass.h
+    src/passes/forward_pass.h src/passes/forward_pass.cpp
+    src/passes/gui_pass.h src/passes/gui_pass.cpp
 )
 
 include(GNUInstallDirs)

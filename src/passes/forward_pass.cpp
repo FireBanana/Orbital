@@ -1,38 +1,91 @@
-#ifndef FORWARD_PIPELINE_H
-#define FORWARD_PIPELINE_H
-
+#include "forward_pass.h"
 #include "../global.h"
 #include "../graphics.h"
-namespace forward_pipeline {
 
-inline void create_sampler()
+ForwardPass::ForwardPass()
 {
-    VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-    vkCreateSampler(Global::g_device, &info, nullptr, &Global::g_pipelines[0].sampler);
+    create_sampler();
+    create_descriptor();
+    create_pipeline();
 }
 
-inline void create_descriptor()
+void ForwardPass::render(VkCommandBuffer *cmd)
 {
-    VkDescriptorSetLayoutBinding binding;
-    binding.binding = 0;
-    binding.descriptorCount = 1;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    binding.pImmutableSamplers = &Global::g_pipelines[0].sampler;
+    vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
-    VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    info.flags
-        = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-    info.bindingCount = 1;
-    info.pBindings = &binding;
+    VkViewport vp{};
+    vp.x = 0;
+    vp.y = static_cast<float>(Global::HEIGHT);
+    vp.width = static_cast<float>(Global::WIDTH);
+    vp.height = -static_cast<float>(Global::HEIGHT); // Flip viewport for Y up
+    vp.minDepth = 0.0f;
+    vp.maxDepth = 1.0f;
 
-    vkCreateDescriptorSetLayout(Global::g_device,
-                                &info,
-                                nullptr,
-                                &Global::g_pipelines[0].descriptor_layout);
+    vkCmdSetViewport(*cmd, 0, 1, &vp);
+
+    VkRect2D scissor{};
+    scissor.extent.width = Global::WIDTH;
+    scissor.extent.height = Global::HEIGHT;
+
+    vkCmdSetScissor(*cmd, 0, 1, &scissor);
+    vkCmdSetCullMode(*cmd, VK_CULL_MODE_BACK_BIT);
+
+    //forward pass
+    if (m_models != nullptr) {
+        for (auto &model : *m_models) {
+            // updates go here
+
+            Global::g_view = glm::lookAt(Global::g_camera_position,
+                                         glm::vec3(0, 0, 0),
+                                         glm::vec3(0, 1, 0));
+            Global::g_constants = {glm::translate(glm::mat4(1.0f),
+                                                  glm::vec3(model.position.x,
+                                                            model.position.y,
+                                                            model.position.z)),
+                                   Global::g_view,
+                                   Global::g_projection,
+                                   glm::vec4(Global::g_camera_position.x,
+                                             Global::g_camera_position.y,
+                                             Global::g_camera_position.z,
+                                             0),
+                                   0};
+            //
+
+            vkCmdPushConstants(*cmd,
+                               m_pipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0,
+                               sizeof(UniformConstants),
+                               &Global::g_constants);
+
+            VkDeviceSize offset{0};
+            vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
+            vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT16);
+
+            VkDescriptorImageInfo image_info{};
+            image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            image_info.imageView = model.texture.view;
+            image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+
+            VkWriteDescriptorSet write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            write_set.dstBinding = 0;
+            write_set.descriptorCount = 1;
+            write_set.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            write_set.pImageInfo = &image_info;
+
+            vkCmdPushDescriptorSet(*cmd,
+                                   VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                   m_pipelineLayout,
+                                   0,
+                                   1,
+                                   &write_set);
+
+            vkCmdDrawIndexed(*cmd, model.index_count, 1, 0, 0, 0);
+        }
+    }
 }
 
-inline void create_pipeline()
+void ForwardPass::create_pipeline()
 {
     VkPushConstantRange range{};
     range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
@@ -41,15 +94,12 @@ inline void create_pipeline()
 
     VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     layout_info.setLayoutCount = 1;
-    layout_info.pSetLayouts = &Global::g_pipelines[0].descriptor_layout;
+    layout_info.pSetLayouts = &m_descriptorSetLayout;
 
     layout_info.pushConstantRangeCount = 1;
     layout_info.pPushConstantRanges = &range;
 
-    vkCreatePipelineLayout(Global::g_device,
-                           &layout_info,
-                           nullptr,
-                           &Global::g_pipelines[0].pipeline_layout);
+    vkCreatePipelineLayout(Global::g_device, &layout_info, nullptr, &m_pipelineLayout);
 
     VkVertexInputBindingDescription binding_desc{};
     binding_desc.binding = 0;
@@ -152,19 +202,34 @@ inline void create_pipeline()
     info.pDepthStencilState = &depth_stencil_state;
     info.pColorBlendState = &blend_state_info;
     info.pDynamicState = &dynamic_state_info;
-    info.layout = Global::g_pipelines[0].pipeline_layout;
+    info.layout = m_pipelineLayout;
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
 
-    vkCreateGraphicsPipelines(Global::g_device,
-                              VK_NULL_HANDLE,
-                              1,
-                              &info,
-                              nullptr,
-                              &Global::g_pipelines[0].pipeline);
+    vkCreateGraphicsPipelines(Global::g_device, VK_NULL_HANDLE, 1, &info, nullptr, &m_pipeline);
 
     //delete shader modules
+};
+void ForwardPass::create_sampler()
+{
+    VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+    vkCreateSampler(Global::g_device, &info, nullptr, &m_sampler);
 }
 
-} // namespace forward_pipeline
-#endif // FORWARD_PIPELINE_H
+void ForwardPass::create_descriptor()
+{
+    VkDescriptorSetLayoutBinding binding;
+    binding.binding = 0;
+    binding.descriptorCount = 1;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    binding.pImmutableSamplers = &m_sampler;
+
+    VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+    info.flags
+        = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+    info.bindingCount = 1;
+    info.pBindings = &binding;
+
+    vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &m_descriptorSetLayout);
+}

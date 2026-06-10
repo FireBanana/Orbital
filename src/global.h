@@ -6,14 +6,6 @@
 #include <atomic>
 #include <thread>
 
-struct Pipeline
-{
-    VkPipeline pipeline;
-    VkPipelineLayout pipeline_layout;
-    VkDescriptorSetLayout descriptor_layout;
-    VkSampler sampler;
-};
-
 // C++17 inline variables
 namespace Global {
 constexpr uint32_t QUEUE_INDEX = 0;
@@ -32,14 +24,6 @@ inline VkDevice g_device;
 inline VkQueue g_queue;
 inline VkSurfaceKHR g_surface;
 inline VkSwapchainKHR g_swapchain;
-// inline VkPipeline g_pipeline;
-// inline VkPipelineLayout g_pipeline_layout;
-// inline VkDescriptorSetLayout g_descriptor_layout;
-// inline VkSampler g_sampler;
-
-// 0 is forward pipeline
-// 1 is ui pipeline
-inline std::vector<Pipeline> g_pipelines;
 
 inline glm::vec3 g_camera_position = glm::vec3(0., 0., 3.0);
 inline glm::mat4 g_model = glm::mat4(1.0f);
