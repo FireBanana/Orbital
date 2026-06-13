@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 
 include(FetchContent)
 
-project(Orbital LANGUAGES CXX)
+project(Orbital LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,7 +27,14 @@ add_executable(Orbital src/main.cpp src/mesh_loader.h src/mesh_loader.cpp shader
     src/passes/pass.h
     src/passes/forward_pass.h src/passes/forward_pass.cpp
     src/passes/gui_pass.h src/passes/gui_pass.cpp
+    src/cuda.cu
+    src/cuda.h
 )
+
+set_target_properties( Orbital
+                       PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+set_source_files_properties(src/cuda.cu PROPERTIES LANGUAGE CUDA)
 
 include(GNUInstallDirs)
 

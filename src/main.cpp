@@ -1,3 +1,4 @@
+#include "cuda.h"
 #include "global.h"
 #include "graphics.h"
 #include "passes/forward_pass.h"
@@ -162,6 +163,9 @@ int main()
     double t = 0.0;
     double dt = 1 / 60.0;
     auto curr_time = std::chrono::high_resolution_clock::now();
+
+    //CUDA
+    CudaSample s{};
 
     // Main loop
     while (1) {
