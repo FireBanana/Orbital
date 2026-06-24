@@ -8,6 +8,10 @@ class Pass
 public:
     virtual inline void render(VkCommandBuffer *cmd) = 0;
     virtual inline void attach_models(std::vector<NativeModel> *models) { m_models = models; }
+    virtual inline void attach_image_resources(std::vector<Texture> *textures)
+    {
+        m_textures = textures;
+    }
 
 protected:
     virtual inline void create_pipeline() = 0;
@@ -19,6 +23,7 @@ protected:
     VkDescriptorSetLayout m_descriptorSetLayout;
     VkSampler m_sampler;
     std::vector<NativeModel> *m_models = nullptr;
+    std::vector<Texture> *m_textures = nullptr;
 };
 
 #endif // PASS_H

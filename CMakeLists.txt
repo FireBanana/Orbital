@@ -2,13 +2,14 @@ cmake_minimum_required(VERSION 3.16)
 
 include(FetchContent)
 
-set(NVIDIA_GPU ON)
+# set(NVIDIA_GPU ON)
 
-if(NVIDIA_GPU)
-    project(Orbital LANGUAGES CXX CUDA)
-else()
-    project(Orbital LANGUAGES CXX HIP)
-endif()
+# if(NVIDIA_GPU)
+#     project(Orbital LANGUAGES CXX CUDA)
+# else()
+#     project(Orbital LANGUAGES CXX HIP)
+# endif()
+project(Orbital LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,30 +28,32 @@ FetchContent_MakeAvailable(fastgltf)
 set(SOURCES
         src/main.cpp src/mesh_loader.h src/mesh_loader.cpp shaders/triangle.vert.slang shaders/triangle.frag.slang
         shaders/line.vert.slang shaders/line.frag.slang
+        shaders/gravity.comp.slang
         src/graphics.h src/graphics.cpp external/stb_image.h
         src/types.h
         src/global.h
         src/passes/pass.h
         src/passes/forward_pass.h src/passes/forward_pass.cpp
         src/passes/gui_pass.h src/passes/gui_pass.cpp
-        src/cuda.h)
-
-if(NVIDIA_GPU)
-    list(APPEND SOURCES src/cuda.cu)
-else()
-    list(APPEND SOURCES src/cuda.hip)
-endif()
+        #src/cuda.h
+        src/passes/n_body_compute.h src/passes/n_body_compute.cpp)
 
 add_executable(Orbital ${SOURCES})
 
-set_target_properties( Orbital
-                       PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+# if(NVIDIA_GPU)
+#     list(APPEND SOURCES src/cuda.cu)
+# else()
+#     list(APPEND SOURCES src/cuda.hip)
+# endif()
 
-if(NVIDIA_GPU)
-    set_source_files_properties(src/cuda.cu PROPERTIES LANGUAGE CUDA)
-else()
-    set_source_files_properties(src/cuda.hip PROPERTIES LANGUAGE HIP)
-endif()
+# set_target_properties( Orbital
+#                        PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+# if(NVIDIA_GPU)
+#     set_source_files_properties(src/cuda.cu PROPERTIES LANGUAGE CUDA)
+# else()
+#     set_source_files_properties(src/cuda.hip PROPERTIES LANGUAGE HIP)
+# endif()
 
 include(GNUInstallDirs)
 

@@ -3,6 +3,7 @@
 #include "graphics.h"
 #include "passes/forward_pass.h"
 #include "passes/gui_pass.h"
+#include "passes/n_body_compute.h"
 #include <iostream>
 #include <random>
 
@@ -115,6 +116,7 @@ int main()
 
     ForwardPass f_pass{};
     GuiPass g_pass{};
+    GravityComputePass gc_pass{};
 
     // ===== Load assets ======
 
@@ -125,13 +127,15 @@ int main()
     auto earth = make_native_model(earth_asset);
 
     std::vector<NativeModel> renderables{50, earth};
+    std::vector<Texture> computeResources{earth.texture};
 
     f_pass.attach_models(&renderables);
 
     // ========================
     std::vector<Pass *> passes = {&f_pass, &g_pass};
+    std::vector<Pass *> cPasses = {&gc_pass};
 
-    begin_render_loop(passes);
+    begin_render_loop(passes, cPasses);
 
     constexpr double min_distance = 3.0, max_distance = 10.0;
     constexpr double min_speed = 0.0001, max_speed = 0.000001;
@@ -163,9 +167,6 @@ int main()
     double t = 0.0;
     double dt = 1 / 60.0;
     auto curr_time = std::chrono::high_resolution_clock::now();
-
-    //CUDA
-    CudaSample s{};
 
     // Main loop
     while (1) {

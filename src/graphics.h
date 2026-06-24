@@ -107,7 +107,7 @@ void transition_image_layout(VkCommandBuffer cmd,
                              VkPipelineStageFlags2 srcStage,
                              VkPipelineStageFlags2 dstStage);
 
-void render(uint32_t img, std::vector<Pass *> passes);
+void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *> computePasses);
 
 VkResult present_image(uint32_t index);
 
@@ -115,6 +115,6 @@ VkResult acquire_swapchain_image(uint32_t *img);
 
 NativeModel make_native_model(Model &model);
 
-void begin_render_loop(std::vector<Pass *> &passes);
+void begin_render_loop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses);
 
 #endif // GRAPHICS_H

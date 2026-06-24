@@ -27,8 +27,11 @@ uint32_t find_memory_type(VkPhysicalDevice phy_device,
 VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits bits)
 {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file)
+    if (!file) {
+        printf("File open failed\n");
+        std::cerr << strerror(errno) << std::endl;
         throw;
+    }
 
     auto byteSize = file.tellg();
     file.seekg(0, std::ios::beg);
@@ -365,6 +368,9 @@ void make_swapchain()
     else
         std::cout << "surface capabilities not found" << std::endl;
 
+    if (!(surface_properties.supportedUsageFlags & VK_IMAGE_USAGE_STORAGE_BIT))
+        std::cout << "Error! Swapchain does not support using storage images";
+
     VkExtent2D swapchain_size;
     swapchain_size.width = Global::WIDTH;
     swapchain_size.height = Global::HEIGHT;
@@ -378,7 +384,7 @@ void make_swapchain()
     info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     info.imageExtent = swapchain_size;
     info.imageArrayLayers = 1;
-    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -452,7 +458,7 @@ void transition_image_layout(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &dep_info);
 }
 
-void render(uint32_t img, std::vector<Pass *> passes)
+void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *> computePasses)
 {
     auto cmd = Global::g_frame_data[img].buffer;
 
@@ -460,16 +466,6 @@ void render(uint32_t img, std::vector<Pass *> passes)
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     vkBeginCommandBuffer(cmd, &begin_info);
-
-    transition_image_layout(cmd,
-                            Global::g_swapchain_images[img],
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_ASPECT_COLOR_BIT,
-                            0,
-                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
     VkClearValue clear_color_value{}, depth_clear_value{};
     clear_color_value.color = {{0, 0, 0}};
@@ -498,9 +494,39 @@ void render(uint32_t img, std::vector<Pass *> passes)
     rendering_info.pColorAttachments = &color_attachment;
     rendering_info.pDepthAttachment = &depth_attachment;
 
+    // Transition swapchain to storage
+    transition_image_layout(cmd,
+                            Global::g_swapchain_images[img],
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_GENERAL,
+                            VK_IMAGE_ASPECT_COLOR_BIT,
+                            0,
+                            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+
+    // Compute Passes
+    std::vector<Texture> res{{.view = Global::g_swapchain_views[img]}};
+    for (auto &pass : computePasses) {
+        pass->attach_image_resources(&res);
+        pass->render(&cmd);
+    }
+
+    // Transition swapchain to color attachment
+    transition_image_layout(cmd,
+                            Global::g_swapchain_images[img],
+                            VK_IMAGE_LAYOUT_GENERAL,
+                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                            VK_IMAGE_ASPECT_COLOR_BIT,
+                            VK_ACCESS_2_SHADER_WRITE_BIT,
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+    // Graphic Passes
     vkCmdBeginRendering(cmd, &rendering_info);
 
-    for (auto &pass : passes)
+    for (auto &pass : graphicsPasses)
         pass->render(&cmd);
 
     vkCmdEndRendering(cmd);
@@ -611,7 +637,7 @@ NativeModel make_native_model(Model &model)
     return {vbuffer, ibuffer, model_tex, static_cast<uint32_t>(model.mesh.indices.size())};
 }
 
-void begin_render_loop(std::vector<Pass *> &pass)
+void begin_render_loop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses)
 {
     Global::g_gui_thread = std::thread([&]() {
         while (!glfwWindowShouldClose(Global::g_window)) {
@@ -623,7 +649,7 @@ void begin_render_loop(std::vector<Pass *> &pass)
                 continue;
             }
 
-            render(frame, pass);
+            render(frame, graphicsPasses, computePasses);
             present_image(frame);
 
             glfwSwapBuffers(Global::g_window);
