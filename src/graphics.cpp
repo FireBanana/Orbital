@@ -103,8 +103,13 @@ void make_device()
                                 "VK_KHR_dynamic_rendering",
                                 "VK_EXT_descriptor_buffer"};
 
+    VkPhysicalDeviceVulkan14Features
+        enable_vulkan14_features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+                                 .pushDescriptor = VK_TRUE};
+
     VkPhysicalDeviceVulkan11Features enable_vulkan11_features
         = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+           .pNext = &enable_vulkan14_features,
            .shaderDrawParameters = VK_TRUE};
 
     VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_features{
@@ -493,6 +498,16 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments = &color_attachment;
     rendering_info.pDepthAttachment = &depth_attachment;
+
+    transition_image_layout(cmd,
+                            Global::g_depth.image,
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                            VK_IMAGE_ASPECT_DEPTH_BIT,
+                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                            0,
+                            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
 
     // Transition swapchain to color attachment
     transition_image_layout(cmd,

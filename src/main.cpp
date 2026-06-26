@@ -138,7 +138,7 @@ int main()
     begin_render_loop(passes, cPasses);
 
     constexpr double min_distance = 3.0, max_distance = 10.0;
-    constexpr double min_speed = 0.0001, max_speed = 0.000001;
+    constexpr double min_speed = 0.000001, max_speed = 0.0001;
     std::mt19937 mt{};
     std::uniform_real_distribution<double> distance_distribution{min_distance, max_distance};
     std::uniform_real_distribution<double> speed_distribution{min_speed, max_speed};
