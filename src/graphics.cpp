@@ -504,10 +504,12 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
                             VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_DEPTH_BIT,
-                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                            0,
-                            VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
-                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT);
+                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
+                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                                | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+                            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
+                            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
+                                | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
 
     // Transition swapchain to color attachment
     transition_image_layout(cmd,
