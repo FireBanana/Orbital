@@ -12,7 +12,7 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 
     VkDescriptorImageInfo image_info{};
-    image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     image_info.imageView = m_textures->at(0).view;
     image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
@@ -22,9 +22,9 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
     write_set.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     write_set.pImageInfo = &image_info;
 
-    vkCmdPushDescriptorSet(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &write_set);
+    vkCmdPushDescriptorSet(*cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, 1, &write_set);
 
-    vkCmdDispatch(*cmd, 256, 1, 1);
+    vkCmdDispatch(*cmd, 900, 800, 1);
 }
 
 void GravityComputePass::create_pipeline()

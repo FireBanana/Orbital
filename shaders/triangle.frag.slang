@@ -38,9 +38,9 @@ float schlick(float3 normal, float3 pos)
 float4 main(VSOutput input)
 {
     float3 light = max(dot(normalize(g_light_dir), normalize(input.Normal)), float3(0.));
-    light /= 3.142;
-    float ambient = 30.;
+    float ambient = 300.;
 
     float4 color = diffuse_texture.Sample(input.Uv);
+    color = pow(color, 1/2.2);
     return float4(color.rgb * light + ambient * schlick(input.Normal, input.WorldPos.xyz), 1.0);
 }

@@ -494,33 +494,15 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     rendering_info.pColorAttachments = &color_attachment;
     rendering_info.pDepthAttachment = &depth_attachment;
 
-    // Transition swapchain to storage
-    transition_image_layout(cmd,
-                            Global::g_swapchain_images[img],
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_GENERAL,
-                            VK_IMAGE_ASPECT_COLOR_BIT,
-                            0,
-                            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
-
-    // Compute Passes
-    std::vector<Texture> res{{.view = Global::g_swapchain_views[img]}};
-    for (auto &pass : computePasses) {
-        pass->attach_image_resources(&res);
-        pass->render(&cmd);
-    }
-
     // Transition swapchain to color attachment
     transition_image_layout(cmd,
                             Global::g_swapchain_images[img],
-                            VK_IMAGE_LAYOUT_GENERAL,
+                            VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
-                            VK_ACCESS_2_SHADER_WRITE_BIT,
+                            0,
                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
     // Graphic Passes
@@ -531,14 +513,32 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
 
     vkCmdEndRendering(cmd);
 
+    // Transition swapchain to storage
     transition_image_layout(cmd,
                             Global::g_swapchain_images[img],
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            VK_IMAGE_LAYOUT_GENERAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
                             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                            0,
+                            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+
+    // Compute Passes
+    std::vector<Texture> res{{.view = Global::g_swapchain_views[img]}};
+    for (auto &pass : computePasses) {
+        pass->attach_image_resources(&res);
+        pass->render(&cmd);
+    }
+
+    transition_image_layout(cmd,
+                            Global::g_swapchain_images[img],
+                            VK_IMAGE_LAYOUT_GENERAL,
+                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            VK_IMAGE_ASPECT_COLOR_BIT,
+                            VK_ACCESS_2_SHADER_WRITE_BIT,
+                            0,
+                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                             VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
 
     vkEndCommandBuffer(cmd);
