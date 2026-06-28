@@ -518,7 +518,8 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
                             0,
-                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                                | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
                             VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
@@ -536,7 +537,8 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_LAYOUT_GENERAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
-                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                                | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
                             VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
@@ -554,7 +556,7 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
                             VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                             VK_IMAGE_ASPECT_COLOR_BIT,
                             VK_ACCESS_2_SHADER_WRITE_BIT,
-                            0,
+                            VK_ACCESS_2_NONE,
                             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                             VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
 
