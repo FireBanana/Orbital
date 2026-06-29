@@ -97,6 +97,8 @@ Texture make_image(TextureDescription desc, Image *image = nullptr);
 
 void make_swapchain();
 
+void make_render_target();
+
 void transition_image_layout(VkCommandBuffer cmd,
                              VkImage img,
                              VkImageLayout oldLayout,

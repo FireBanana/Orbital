@@ -33,6 +33,7 @@ int main()
         std::cout << "Surface creation failed " << res << std::endl;
 
     make_swapchain();
+    make_render_target();
 
     Global::g_depth = make_image({Global::WIDTH,
                                   Global::HEIGHT,

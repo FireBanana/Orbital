@@ -187,7 +187,7 @@ void ForwardPass::create_pipeline()
 
     VkPipelineRenderingCreateInfo rendering_info{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
     rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachmentFormats = &Global::FORMAT;
+    rendering_info.pColorAttachmentFormats = &Global::RENDER_TARGET_FORMAT;
     rendering_info.depthAttachmentFormat = Global::DEPTH_FORMAT;
 
     VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};

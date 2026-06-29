@@ -362,6 +362,20 @@ Texture make_image(TextureDescription desc, Image *image)
     return result;
 }
 
+void make_render_target()
+{
+    for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
+        auto target = make_image({Global::WIDTH,
+                                  Global::HEIGHT,
+                                  Global::RENDER_TARGET_FORMAT,
+                                  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                                      | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                                  VK_IMAGE_ASPECT_COLOR_BIT});
+
+        Global::g_render_targets.push_back(std::move(target));
+    }
+}
+
 void make_swapchain()
 {
     VkSurfaceCapabilitiesKHR surface_properties;
@@ -389,7 +403,7 @@ void make_swapchain()
     info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     info.imageExtent = swapchain_size;
     info.imageArrayLayers = 1;
-    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
     info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
@@ -477,7 +491,7 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     depth_clear_value.depthStencil = {1, 0};
 
     VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    color_attachment.imageView = Global::g_swapchain_views[img];
+    color_attachment.imageView = Global::g_render_targets[img].view;
     color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -513,7 +527,7 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
 
     // Transition swapchain to color attachment
     transition_image_layout(cmd,
-                            Global::g_swapchain_images[img],
+                            Global::g_render_targets[img].image,
                             VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
@@ -533,32 +547,81 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
 
     // Transition swapchain to storage
     transition_image_layout(cmd,
-                            Global::g_swapchain_images[img],
+                            Global::g_render_targets[img].image,
                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                             VK_IMAGE_LAYOUT_GENERAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
-                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                                | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
                             VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
                             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
     // Compute Passes
-    std::vector<Texture> res{{.view = Global::g_swapchain_views[img]}};
+    std::vector<Texture> res{{.view = Global::g_render_targets[img].view}};
     for (auto &pass : computePasses) {
         pass->attach_image_resources(&res);
         pass->render(&cmd);
     }
 
     transition_image_layout(cmd,
-                            Global::g_swapchain_images[img],
+                            Global::g_render_targets[img].image,
                             VK_IMAGE_LAYOUT_GENERAL,
-                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                             VK_IMAGE_ASPECT_COLOR_BIT,
                             VK_ACCESS_2_SHADER_WRITE_BIT,
-                            VK_ACCESS_2_NONE,
+                            VK_ACCESS_2_TRANSFER_READ_BIT,
                             VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                            VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT);
+                            VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+
+    VkImageBlit2 blitRegion{.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr};
+
+    blitRegion.srcOffsets[1].x = Global::WIDTH;
+    blitRegion.srcOffsets[1].y = Global::HEIGHT;
+    blitRegion.srcOffsets[1].z = 1;
+
+    blitRegion.dstOffsets[1].x = Global::WIDTH;
+    blitRegion.dstOffsets[1].y = Global::HEIGHT;
+    blitRegion.dstOffsets[1].z = 1;
+
+    blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.srcSubresource.baseArrayLayer = 0;
+    blitRegion.srcSubresource.layerCount = 1;
+    blitRegion.srcSubresource.mipLevel = 0;
+
+    blitRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    blitRegion.dstSubresource.baseArrayLayer = 0;
+    blitRegion.dstSubresource.layerCount = 1;
+    blitRegion.dstSubresource.mipLevel = 0;
+
+    VkBlitImageInfo2 blitInfo{VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2};
+    blitInfo.srcImage = Global::g_render_targets[img].image;
+    blitInfo.dstImage = Global::g_swapchain_images[img];
+    blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    blitInfo.regionCount = 1;
+    blitInfo.pRegions = &blitRegion;
+
+    transition_image_layout(cmd,
+                            Global::g_swapchain_images[img],
+                            VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            VK_IMAGE_ASPECT_COLOR_BIT,
+                            {},
+                            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                            VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+
+    vkCmdBlitImage2(cmd, &blitInfo);
+
+    transition_image_layout(cmd,
+                            Global::g_swapchain_images[img],
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                            VK_IMAGE_ASPECT_COLOR_BIT,
+                            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
     vkEndCommandBuffer(cmd);
 

@@ -12,9 +12,10 @@ constexpr uint32_t QUEUE_INDEX = 0;
 constexpr uint32_t WIDTH = 800;
 constexpr uint32_t HEIGHT = 600;
 constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_UNORM;
+constexpr VkFormat RENDER_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D16_UNORM;
 constexpr uint32_t SWAPCHAIN_SIZE = 3;
-constexpr uint32_t FRAMES_IN_FLIGHT = 2;
+//constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 inline GLFWwindow *g_window;
 
@@ -24,6 +25,7 @@ inline VkDevice g_device;
 inline VkQueue g_queue;
 inline VkSurfaceKHR g_surface;
 inline VkSwapchainKHR g_swapchain;
+inline std::vector<Texture> g_render_targets;
 
 inline glm::vec3 g_camera_position = glm::vec3(0., 0., 3.0);
 inline glm::mat4 g_model = glm::mat4(1.0f);
