@@ -51,6 +51,7 @@ struct BufferDescription
 {
     VkDeviceSize buffer_size;
     VkBufferUsageFlags usage;
+    VkMemoryPropertyFlags memProperty;
 };
 
 struct Buffer

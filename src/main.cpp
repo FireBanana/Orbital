@@ -127,7 +127,15 @@ int main()
     auto monkey = make_native_model(monkey_asset);
     auto earth = make_native_model(earth_asset);
 
-    std::vector<NativeModel> renderables{50, earth};
+    std::vector<NativeModel> renderables{50};
+
+    for (int i = 0; i < 50; ++i) {
+        if (i % 2 == 0)
+            renderables[i] = earth;
+        else
+            renderables[i] = monkey;
+    }
+
     std::vector<Texture> computeResources{earth.texture};
 
     f_pass.attach_models(&renderables);
@@ -182,12 +190,11 @@ int main()
             float delta = std::min(frame_time, dt);
 
             for (auto i = 1; i < renderables.size(); ++i) {
-                renderables[i].position
-                    = {static_cast<float>(glm::sin(game_objects[i].speed * dt * frame)
-                                          * game_objects[i].distance),
-                       0.0,
-                       static_cast<float>(glm::cos(game_objects[i].speed * dt * frame)
-                                          * game_objects[i].distance)};
+                renderables[i].position = {static_cast<float>(glm::sin(game_objects[i].speed * t)
+                                                              * game_objects[i].distance),
+                                           0.0,
+                                           static_cast<float>(glm::cos(game_objects[i].speed * t)
+                                                              * game_objects[i].distance)};
             }
 
             frame_time -= delta;

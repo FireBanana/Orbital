@@ -7,6 +7,8 @@
 #include <iostream>
 #include <vector>
 
+// TODO: Move compute stuff to a compute queue https://github.com/KhronosGroup/Vulkan-Samples/blob/main/samples/performance/async_compute/README.adoc
+
 uint32_t find_memory_type(VkPhysicalDevice phy_device,
                           uint32_t filter_type,
                           VkMemoryPropertyFlags props)
@@ -164,10 +166,9 @@ Buffer make_buffer(BufferDescription desc, void *data)
     //Assume memory index 0
     VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
     alloc_info.allocationSize = mem_req.size;
-    alloc_info.memoryTypeIndex = find_memory_type(Global::g_physical_device,
+    alloc_info.memoryTypeIndex = find_memory_type(Global::g_physical_device, // Add cached bit option
                                                   mem_req.memoryTypeBits,
-                                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                                      | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                                                  desc.memProperty);
     if (vkAllocateMemory(Global::g_device, &alloc_info, nullptr, &result.memory) == VK_SUCCESS)
         std::cout << "Allocated triangle memory" << std::endl;
     else
@@ -175,7 +176,9 @@ Buffer make_buffer(BufferDescription desc, void *data)
 
     vkBindBufferMemory(Global::g_device, result.buffer, result.memory, 0);
 
-    if (data != nullptr) {
+    if (data != nullptr && desc.memProperty & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+        //TODO: implement
+    } else if (data != nullptr) {
         vkMapMemory(Global::g_device, result.memory, 0, desc.buffer_size, 0, &result.mapped_data);
         memcpy(result.mapped_data, data, (size_t) desc.buffer_size);
         vkUnmapMemory(Global::g_device, result.memory);
@@ -263,7 +266,9 @@ Texture make_image(TextureDescription desc, Image *image)
     if (image != nullptr) {
         auto buffer = make_buffer({sizeof(unsigned char) * image->width * image->height
                                        * image->channels,
-                                   VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT},
+                                   VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT,
+                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                       | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
                                   image->data);
 
         // Create and update mip levels here, each level will need VkBufferImageCopy
@@ -703,10 +708,14 @@ VkResult acquire_swapchain_image(uint32_t *img)
 NativeModel make_native_model(Model &model)
 {
     auto vbuffer = make_buffer({sizeof(vertex) * model.mesh.vertices.size(),
-                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT},
+                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                    | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
                                model.mesh.vertices.data());
     auto ibuffer = make_buffer({sizeof(uint16_t) * model.mesh.indices.size(),
-                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT},
+                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                    | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
                                model.mesh.indices.data());
 
     auto model_tex = make_image({model.material.textures[0].width,

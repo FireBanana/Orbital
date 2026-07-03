@@ -13,6 +13,11 @@ public:
 private:
     void create_pipeline() override;
     void create_descriptor() override;
+
+    void generateData();
+
+    std::vector<glm::vec4> m_bodies;
+    Buffer m_dataBuffer;
 };
 
 #endif // N_BODY_COMPUTE_H

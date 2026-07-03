@@ -5,6 +5,7 @@ GravityComputePass::GravityComputePass()
 {
     create_descriptor();
     create_pipeline();
+    generateData();
 }
 
 void GravityComputePass::render(VkCommandBuffer *cmd)
@@ -16,15 +17,32 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
     image_info.imageView = m_textures->at(0).view;
     image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
-    VkWriteDescriptorSet write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    write_set.dstBinding = 0;
-    write_set.descriptorCount = 1;
-    write_set.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    write_set.pImageInfo = &image_info;
+    VkDescriptorBufferInfo buffer_info{};
+    buffer_info.buffer = m_dataBuffer.buffer;
+    buffer_info.range = m_bodies.size() * sizeof(glm::vec4);
 
-    vkCmdPushDescriptorSet(*cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, 1, &write_set);
+    VkWriteDescriptorSet image_write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    image_write_set.dstBinding = 0;
+    image_write_set.descriptorCount = 1;
+    image_write_set.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    image_write_set.pImageInfo = &image_info;
 
-    vkCmdDispatch(*cmd, 900, 800, 1);
+    VkWriteDescriptorSet buffer_write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    buffer_write_set.dstBinding = 1;
+    buffer_write_set.descriptorCount = 1;
+    buffer_write_set.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    buffer_write_set.pBufferInfo = &buffer_info;
+
+    std::array<VkWriteDescriptorSet, 2> writeSets{image_write_set, buffer_write_set};
+
+    vkCmdPushDescriptorSet(*cmd,
+                           VK_PIPELINE_BIND_POINT_COMPUTE,
+                           m_pipelineLayout,
+                           0,
+                           2,
+                           writeSets.data());
+
+    vkCmdDispatch(*cmd, m_bodies.size(), m_bodies.size(), 1);
 }
 
 void GravityComputePass::create_pipeline()
@@ -60,17 +78,49 @@ void GravityComputePass::create_pipeline()
 
 void GravityComputePass::create_descriptor()
 {
-    VkDescriptorSetLayoutBinding binding;
-    binding.binding = 0;
-    binding.descriptorCount = 1;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    VkDescriptorSetLayoutBinding binding1;
+    binding1.binding = 0;
+    binding1.descriptorCount = 1;
+    binding1.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    binding1.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutBinding binding2;
+    binding2.binding = 1;
+    binding2.descriptorCount = 1;
+    binding2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    binding2.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings{binding1, binding2};
 
     VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     info.flags
         = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-    info.bindingCount = 1;
-    info.pBindings = &binding;
+    info.bindingCount = bindings.size();
+    info.pBindings = bindings.data();
 
     vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &m_descriptorSetLayout);
+}
+
+void GravityComputePass::generateData()
+{
+    m_bodies = {
+        // glm::vec4(X, Y, Z, Mass)
+        glm::vec4(0.0e0f, 0.0f, 0.0f, 1.989e30f),    // Sun
+        glm::vec4(5.79e10f, 0.0f, 0.0f, 3.301e23f),  // Mercury
+        glm::vec4(1.082e11f, 0.0f, 0.0f, 4.867e24f), // Venus
+        glm::vec4(1.496e11f, 0.0f, 0.0f, 5.972e24f), // Earth
+        glm::vec4(2.279e11f, 0.0f, 0.0f, 6.417e23f), // Mars
+        glm::vec4(7.785e11f, 0.0f, 0.0f, 1.898e27f), // Jupiter
+        glm::vec4(1.433e12f, 0.0f, 0.0f, 5.683e26f), // Saturn
+        glm::vec4(2.877e12f, 0.0f, 0.0f, 8.681e25f), // Uranus
+        glm::vec4(4.503e12f, 0.0f, 0.0f, 1.024e26f)  // Neptune
+    };
+
+    m_dataBuffer = make_buffer({m_bodies.size() * sizeof(glm::vec4),
+                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                    | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+                                    | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+                                    | VK_MEMORY_PROPERTY_HOST_CACHED_BIT},
+                               m_bodies.data());
 }
