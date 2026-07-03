@@ -11,8 +11,8 @@ public:
     void render(VkCommandBuffer *cmd) override;
 
 private:
-    void create_pipeline() override;
-    void create_descriptor() override;
+    void createPipeline() override;
+    void createDescriptor() override;
 
     void generateData();
 

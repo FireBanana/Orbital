@@ -9,16 +9,16 @@
 
 // TODO: Move compute stuff to a compute queue https://github.com/KhronosGroup/Vulkan-Samples/blob/main/samples/performance/async_compute/README.adoc
 
-uint32_t find_memory_type(VkPhysicalDevice phy_device,
-                          uint32_t filter_type,
+uint32_t findMemoryType(VkPhysicalDevice phyDevice,
+                          uint32_t filterType,
                           VkMemoryPropertyFlags props)
 {
-    VkPhysicalDeviceMemoryProperties mem_properties;
-    vkGetPhysicalDeviceMemoryProperties(phy_device, &mem_properties);
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(phyDevice, &memProperties);
 
-    for (auto i = 0; i < mem_properties.memoryTypeCount; ++i) {
-        if (filter_type & (1 << i)) {
-            if ((mem_properties.memoryTypes[i].propertyFlags & props) == props)
+    for (auto i = 0; i < memProperties.memoryTypeCount; ++i) {
+        if (filterType & (1 << i)) {
+            if ((memProperties.memoryTypes[i].propertyFlags & props) == props)
                 return i;
         }
     }
@@ -26,7 +26,7 @@ uint32_t find_memory_type(VkPhysicalDevice phy_device,
     throw;
 }
 
-VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits bits)
+VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bits)
 {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) {
@@ -44,39 +44,39 @@ VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits b
     std::vector<uint32_t> buffer(byteSize / sizeof(uint32_t));
     file.read(reinterpret_cast<char *>(buffer.data()), byteSize);
 
-    VkShaderModuleCreateInfo create_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
-    create_info.codeSize = buffer.size() * sizeof(uint32_t);
-    create_info.pCode = buffer.data();
+    VkShaderModuleCreateInfo createInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
+    createInfo.codeSize = buffer.size() * sizeof(uint32_t);
+    createInfo.pCode = buffer.data();
 
     VkShaderModule module;
-    if (vkCreateShaderModule(Global::g_device, &create_info, nullptr, &module) == VK_SUCCESS)
+    if (vkCreateShaderModule(Global::g_device, &createInfo, nullptr, &module) == VK_SUCCESS)
         std::cout << "Shader made" << std::endl;
     else
         std::cout << "Shader failed" << std::endl;
     return module;
 }
 
-void make_instance()
+void makeInstance()
 {
-    uint32_t inst_extension_count = 0;
-    vkEnumerateInstanceExtensionProperties(nullptr, &inst_extension_count, nullptr);
+    uint32_t instExtensionCount = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &instExtensionCount, nullptr);
 
-    std::vector<VkExtensionProperties> extension{inst_extension_count};
-    vkEnumerateInstanceExtensionProperties(nullptr, &inst_extension_count, extension.data());
+    std::vector<VkExtensionProperties> extension{instExtensionCount};
+    vkEnumerateInstanceExtensionProperties(nullptr, &instExtensionCount, extension.data());
 
-    std::cout << "Found " << inst_extension_count << " extensions" << std::endl;
+    std::cout << "Found " << instExtensionCount << " extensions" << std::endl;
 
-    VkApplicationInfo app_info{};
-    app_info.pApplicationName = "Orbital";
-    app_info.apiVersion = VK_API_VERSION_1_4;
+    VkApplicationInfo appInfo{};
+    appInfo.pApplicationName = "Orbital";
+    appInfo.apiVersion = VK_API_VERSION_1_4;
 
-    uint32_t ext_count = 0;
-    auto extensions = glfwGetRequiredInstanceExtensions(&ext_count);
+    uint32_t extCount = 0;
+    auto extensions = glfwGetRequiredInstanceExtensions(&extCount);
 
     VkInstanceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    info.pApplicationInfo = &app_info;
-    info.enabledExtensionCount = ext_count;
+    info.pApplicationInfo = &appInfo;
+    info.enabledExtensionCount = extCount;
     info.ppEnabledExtensionNames = extensions;
 
     if (vkCreateInstance(&info, nullptr, &Global::g_instance) == VK_SUCCESS)
@@ -85,15 +85,15 @@ void make_instance()
         std::cout << "Creation instance failed" << std::endl;
 }
 
-void make_device()
+void makeDevice()
 {
-    uint32_t gpu_count = 0;
-    vkEnumeratePhysicalDevices(Global::g_instance, &gpu_count, nullptr);
+    uint32_t gpuCount = 0;
+    vkEnumeratePhysicalDevices(Global::g_instance, &gpuCount, nullptr);
 
-    std::vector<VkPhysicalDevice> devices{gpu_count};
-    vkEnumeratePhysicalDevices(Global::g_instance, &gpu_count, devices.data());
+    std::vector<VkPhysicalDevice> devices{gpuCount};
+    vkEnumeratePhysicalDevices(Global::g_instance, &gpuCount, devices.data());
 
-    std::cout << "Found " << gpu_count << " gpus" << std::endl;
+    std::cout << "Found " << gpuCount << " gpus" << std::endl;
 
     Global::g_physical_device = devices[0];
 
@@ -106,39 +106,39 @@ void make_device()
                                 "VK_EXT_descriptor_buffer"};
 
     VkPhysicalDeviceVulkan14Features
-        enable_vulkan14_features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+        enableVulkan14Features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
                                  .pushDescriptor = VK_TRUE};
 
-    VkPhysicalDeviceVulkan11Features enable_vulkan11_features
+    VkPhysicalDeviceVulkan11Features enableVulkan11Features
         = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-           .pNext = &enable_vulkan14_features,
+           .pNext = &enableVulkan14Features,
            .shaderDrawParameters = VK_TRUE};
 
-    VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptor_features{
+    VkPhysicalDeviceDescriptorBufferFeaturesEXT descriptorFeatures{
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_BUFFER_FEATURES_EXT,
-        .pNext = &enable_vulkan11_features,
+        .pNext = &enableVulkan11Features,
         .descriptorBuffer = VK_TRUE};
 
-    VkPhysicalDeviceVulkan13Features enable_vulkan13_features = {
+    VkPhysicalDeviceVulkan13Features enableVulkan13Features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-        .pNext = &descriptor_features,
+        .pNext = &descriptorFeatures,
         .synchronization2 = VK_TRUE,
         .dynamicRendering = VK_TRUE,
     };
 
-    VkDeviceQueueCreateInfo queue_info{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
-    queue_info.queueFamilyIndex = Global::QUEUE_INDEX;
-    queue_info.queueCount = 1;
-    queue_info.pQueuePriorities = &priority;
+    VkDeviceQueueCreateInfo queueInfo{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
+    queueInfo.queueFamilyIndex = Global::QUEUE_INDEX;
+    queueInfo.queueCount = 1;
+    queueInfo.pQueuePriorities = &priority;
 
-    VkDeviceCreateInfo device_info{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
-    device_info.pNext = &enable_vulkan13_features;
-    device_info.queueCreateInfoCount = 1;
-    device_info.pQueueCreateInfos = &queue_info;
-    device_info.ppEnabledExtensionNames = extensions;
-    device_info.enabledExtensionCount = 3;
+    VkDeviceCreateInfo deviceInfo{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
+    deviceInfo.pNext = &enableVulkan13Features;
+    deviceInfo.queueCreateInfoCount = 1;
+    deviceInfo.pQueueCreateInfos = &queueInfo;
+    deviceInfo.ppEnabledExtensionNames = extensions;
+    deviceInfo.enabledExtensionCount = 3;
 
-    if (vkCreateDevice(devices[0], &device_info, nullptr, &Global::g_device) == VK_SUCCESS)
+    if (vkCreateDevice(devices[0], &deviceInfo, nullptr, &Global::g_device) == VK_SUCCESS)
         std::cout << "Created device" << std::endl;
     else
         std::cout << "Creating device failed" << std::endl;
@@ -146,30 +146,30 @@ void make_device()
     vkGetDeviceQueue(Global::g_device, Global::QUEUE_INDEX, 0, &Global::g_queue);
 }
 
-Buffer make_buffer(BufferDescription desc, void *data)
+Buffer makeBuffer(BufferDescription desc, void *data)
 {
     Buffer result{};
 
-    VkBufferCreateInfo vertex_b_info{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
-    vertex_b_info.size = desc.buffer_size;
-    vertex_b_info.usage = desc.usage;
-    vertex_b_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    VkBufferCreateInfo vertexBInfo{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+    vertexBInfo.size = desc.bufferSize;
+    vertexBInfo.usage = desc.usage;
+    vertexBInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(Global::g_device, &vertex_b_info, nullptr, &result.buffer) == VK_SUCCESS)
+    if (vkCreateBuffer(Global::g_device, &vertexBInfo, nullptr, &result.buffer) == VK_SUCCESS)
         std::cout << "Made triangle buffer" << std::endl;
     else
         std::cout << "Triangle buffer failed" << std::endl;
 
-    VkMemoryRequirements mem_req;
-    vkGetBufferMemoryRequirements(Global::g_device, result.buffer, &mem_req);
+    VkMemoryRequirements memReq;
+    vkGetBufferMemoryRequirements(Global::g_device, result.buffer, &memReq);
 
     //Assume memory index 0
-    VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    alloc_info.allocationSize = mem_req.size;
-    alloc_info.memoryTypeIndex = find_memory_type(Global::g_physical_device, // Add cached bit option
-                                                  mem_req.memoryTypeBits,
+    VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    allocInfo.allocationSize = memReq.size;
+    allocInfo.memoryTypeIndex = findMemoryType(Global::g_physical_device, // Add cached bit option
+                                                  memReq.memoryTypeBits,
                                                   desc.memProperty);
-    if (vkAllocateMemory(Global::g_device, &alloc_info, nullptr, &result.memory) == VK_SUCCESS)
+    if (vkAllocateMemory(Global::g_device, &allocInfo, nullptr, &result.memory) == VK_SUCCESS)
         std::cout << "Allocated triangle memory" << std::endl;
     else
         std::cout << "Triangle memory failed" << std::endl;
@@ -179,15 +179,15 @@ Buffer make_buffer(BufferDescription desc, void *data)
     if (data != nullptr && desc.memProperty & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
         //TODO: implement
     } else if (data != nullptr) {
-        vkMapMemory(Global::g_device, result.memory, 0, desc.buffer_size, 0, &result.mapped_data);
-        memcpy(result.mapped_data, data, (size_t) desc.buffer_size);
+        vkMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
+        memcpy(result.mappedData, data, (size_t) desc.bufferSize);
         vkUnmapMemory(Global::g_device, result.memory);
     }
 
     return result;
 }
 
-void init_per_frame(int index)
+void initPerFrame(int index)
 {
     VkFenceCreateInfo info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -198,29 +198,29 @@ void init_per_frame(int index)
     else
         std::cout << "Fence failed" << std::endl;
 
-    VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    pool_info.queueFamilyIndex = static_cast<uint32_t>(Global::QUEUE_INDEX);
+    VkCommandPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+    poolInfo.queueFamilyIndex = static_cast<uint32_t>(Global::QUEUE_INDEX);
 
-    if (vkCreateCommandPool(Global::g_device, &pool_info, nullptr, &Global::g_frame_data[index].pool)
+    if (vkCreateCommandPool(Global::g_device, &poolInfo, nullptr, &Global::g_frame_data[index].pool)
         == VK_SUCCESS)
         std::cout << "pool made" << std::endl;
     else
         std::cout << "pool failed" << std::endl;
 
-    VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    buf_info.commandPool = Global::g_frame_data[index].pool;
-    buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    buf_info.commandBufferCount = 1;
+    VkCommandBufferAllocateInfo bufInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    bufInfo.commandPool = Global::g_frame_data[index].pool;
+    bufInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    bufInfo.commandBufferCount = 1;
 
-    if (vkAllocateCommandBuffers(Global::g_device, &buf_info, &Global::g_frame_data[index].buffer)
+    if (vkAllocateCommandBuffers(Global::g_device, &bufInfo, &Global::g_frame_data[index].buffer)
         == VK_SUCCESS)
         std::cout << "buffer made" << std::endl;
     else
         std::cout << "buffer failed" << std::endl;
 }
 
-Texture make_image(TextureDescription desc, Image *image)
+Texture makeImage(TextureDescription desc, Image *image)
 {
     Texture result{};
 
@@ -238,33 +238,33 @@ Texture make_image(TextureDescription desc, Image *image)
 
     vkCreateImage(Global::g_device, &info, nullptr, &result.image);
 
-    VkMemoryRequirements mem_reqs{};
-    vkGetImageMemoryRequirements(Global::g_device, result.image, &mem_reqs);
+    VkMemoryRequirements memReqs{};
+    vkGetImageMemoryRequirements(Global::g_device, result.image, &memReqs);
 
-    VkMemoryAllocateInfo alloc_info{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    alloc_info.allocationSize = mem_reqs.size;
-    alloc_info.memoryTypeIndex = find_memory_type(Global::g_physical_device,
-                                                  mem_reqs.memoryTypeBits,
+    VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    allocInfo.allocationSize = memReqs.size;
+    allocInfo.memoryTypeIndex = findMemoryType(Global::g_physical_device,
+                                                memReqs.memoryTypeBits,
                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    vkAllocateMemory(Global::g_device, &alloc_info, nullptr, &result.memory);
+    vkAllocateMemory(Global::g_device, &allocInfo, nullptr, &result.memory);
     vkBindImageMemory(Global::g_device, result.image, result.memory, 0);
 
-    VkImageViewCreateInfo create_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    create_info.image = result.image;
-    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    create_info.format = desc.format;
-    create_info.subresourceRange.aspectMask = desc.aspect;
-    create_info.subresourceRange.baseMipLevel = 0;
-    create_info.subresourceRange.levelCount = 1;
-    create_info.subresourceRange.baseArrayLayer = 0;
-    create_info.subresourceRange.layerCount = 1;
+    VkImageViewCreateInfo createInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    createInfo.image = result.image;
+    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    createInfo.format = desc.format;
+    createInfo.subresourceRange.aspectMask = desc.aspect;
+    createInfo.subresourceRange.baseMipLevel = 0;
+    createInfo.subresourceRange.levelCount = 1;
+    createInfo.subresourceRange.baseArrayLayer = 0;
+    createInfo.subresourceRange.layerCount = 1;
 
-    vkCreateImageView(Global::g_device, &create_info, nullptr, &result.view);
+    vkCreateImageView(Global::g_device, &createInfo, nullptr, &result.view);
 
     // Staging
     if (image != nullptr) {
-        auto buffer = make_buffer({sizeof(unsigned char) * image->width * image->height
+        auto buffer = makeBuffer({sizeof(unsigned char) * image->width * image->height
                                        * image->channels,
                                    VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT,
                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
@@ -273,41 +273,41 @@ Texture make_image(TextureDescription desc, Image *image)
 
         // Create and update mip levels here, each level will need VkBufferImageCopy
         // https://docs.vulkan.org/samples/latest/samples/api/texture_mipmap_generation/README.html
-        VkBufferImageCopy copy_region{};
+        VkBufferImageCopy copyRegion{};
 
-        copy_region.imageSubresource.aspectMask = desc.aspect;
-        copy_region.imageSubresource.mipLevel = 0;
-        copy_region.imageSubresource.baseArrayLayer = 0;
-        copy_region.imageSubresource.layerCount = 1;
-        copy_region.imageExtent.width = image->width;
-        copy_region.imageExtent.height = image->height;
-        copy_region.imageExtent.depth = 1;
-        copy_region.imageOffset = {0, 0, 0};
-        copy_region.bufferOffset = {0};
-        copy_region.bufferRowLength = 0;
-        copy_region.bufferImageHeight = 0;
+        copyRegion.imageSubresource.aspectMask = desc.aspect;
+        copyRegion.imageSubresource.mipLevel = 0;
+        copyRegion.imageSubresource.baseArrayLayer = 0;
+        copyRegion.imageSubresource.layerCount = 1;
+        copyRegion.imageExtent.width = image->width;
+        copyRegion.imageExtent.height = image->height;
+        copyRegion.imageExtent.depth = 1;
+        copyRegion.imageOffset = {0, 0, 0};
+        copyRegion.bufferOffset = {0};
+        copyRegion.bufferRowLength = 0;
+        copyRegion.bufferImageHeight = 0;
 
         // Pool for this, maybe need a higher order pool handler
 
-        VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-        pool_info.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-        pool_info.queueFamilyIndex = static_cast<uint32_t>(Global::QUEUE_INDEX);
+        VkCommandPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolInfo.queueFamilyIndex = static_cast<uint32_t>(Global::QUEUE_INDEX);
 
         VkCommandPool pool;
-        vkCreateCommandPool(Global::g_device, &pool_info, nullptr, &pool);
+        vkCreateCommandPool(Global::g_device, &poolInfo, nullptr, &pool);
 
-        VkCommandBufferAllocateInfo buf_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-        buf_info.commandPool = pool;
-        buf_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        buf_info.commandBufferCount = 1;
+        VkCommandBufferAllocateInfo bufInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        bufInfo.commandPool = pool;
+        bufInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        bufInfo.commandBufferCount = 1;
 
         VkCommandBuffer cmd;
-        vkAllocateCommandBuffers(Global::g_device, &buf_info, &cmd);
+        vkAllocateCommandBuffers(Global::g_device, &bufInfo, &cmd);
 
-        VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-        begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        vkBeginCommandBuffer(cmd, &begin_info);
+        vkBeginCommandBuffer(cmd, &beginInfo);
 
         VkImageSubresourceRange range{};
         range.aspectMask = desc.aspect;
@@ -315,62 +315,62 @@ Texture make_image(TextureDescription desc, Image *image)
         range.levelCount = 0;
         range.layerCount = 1;
 
-        transition_image_layout(cmd,
-                                result.image,
-                                VK_IMAGE_LAYOUT_UNDEFINED,
-                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                desc.aspect,
-                                {},
-                                VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                                VK_PIPELINE_STAGE_2_HOST_BIT,
-                                VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+        transitionImageLayout(cmd,
+                              result.image,
+                              VK_IMAGE_LAYOUT_UNDEFINED,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              desc.aspect,
+                              {},
+                              VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                              VK_PIPELINE_STAGE_2_HOST_BIT,
+                              VK_PIPELINE_STAGE_2_TRANSFER_BIT);
 
         vkCmdCopyBufferToImage(cmd,
                                buffer.buffer,
                                result.image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                1,
-                               &copy_region);
+                               &copyRegion);
 
-        transition_image_layout(cmd,
-                                result.image,
-                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                                desc.aspect,
-                                VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                                VK_ACCESS_2_SHADER_READ_BIT,
-                                VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+        transitionImageLayout(cmd,
+                              result.image,
+                              VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                              VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                              desc.aspect,
+                              VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                              VK_ACCESS_2_SHADER_READ_BIT,
+                              VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                              VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 
         vkEndCommandBuffer(cmd);
 
         //submit
-        VkSemaphore staging_semaphore;
-        VkSemaphoreCreateInfo sem_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        vkCreateSemaphore(Global::g_device, &sem_info, nullptr, &staging_semaphore);
+        VkSemaphore stagingSemaphore;
+        VkSemaphoreCreateInfo semInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        vkCreateSemaphore(Global::g_device, &semInfo, nullptr, &stagingSemaphore);
 
-        VkFence staging_fence;
-        VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-        vkCreateFence(Global::g_device, &fence_info, nullptr, &staging_fence);
+        VkFence stagingFence;
+        VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        vkCreateFence(Global::g_device, &fenceInfo, nullptr, &stagingFence);
 
-        VkSubmitInfo submit_info{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-        submit_info.commandBufferCount = 1;
-        submit_info.pCommandBuffers = &cmd;
-        submit_info.signalSemaphoreCount = 1;
-        submit_info.pSignalSemaphores = &staging_semaphore;
+        VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &cmd;
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &stagingSemaphore;
 
-        vkQueueSubmit(Global::g_queue, 1, &submit_info, staging_fence);
+        vkQueueSubmit(Global::g_queue, 1, &submitInfo, stagingFence);
 
-        vkWaitForFences(Global::g_device, 1, &staging_fence, VK_TRUE, UINT64_MAX);
+        vkWaitForFences(Global::g_device, 1, &stagingFence, VK_TRUE, UINT64_MAX);
     }
 
     return result;
 }
 
-void make_render_target()
+void makeRenderTarget()
 {
     for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
-        auto target = make_image({Global::WIDTH,
+        auto target = makeImage({Global::WIDTH,
                                   Global::HEIGHT,
                                   Global::RENDER_TARGET_FORMAT,
                                   VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
@@ -381,32 +381,32 @@ void make_render_target()
     }
 }
 
-void make_swapchain()
+void makeSwapchain()
 {
-    VkSurfaceCapabilitiesKHR surface_properties;
+    VkSurfaceCapabilitiesKHR surfaceProperties;
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Global::g_physical_device,
                                                   Global::g_surface,
-                                                  &surface_properties)
+                                                  &surfaceProperties)
         == VK_SUCCESS)
         std::cout << "surface capabilities found" << std::endl;
     else
         std::cout << "surface capabilities not found" << std::endl;
 
-    if (!(surface_properties.supportedUsageFlags & VK_IMAGE_USAGE_STORAGE_BIT))
+    if (!(surfaceProperties.supportedUsageFlags & VK_IMAGE_USAGE_STORAGE_BIT))
         std::cout << "Error! Swapchain does not support using storage images";
 
-    VkExtent2D swapchain_size;
-    swapchain_size.width = Global::WIDTH;
-    swapchain_size.height = Global::HEIGHT;
+    VkExtent2D swapchainSize;
+    swapchainSize.width = Global::WIDTH;
+    swapchainSize.height = Global::HEIGHT;
 
-    uint32_t desired_images = Global::SWAPCHAIN_SIZE; //Assuming more than min
+    uint32_t desiredImages = Global::SWAPCHAIN_SIZE; //Assuming more than min
 
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     info.surface = Global::g_surface;
-    info.minImageCount = desired_images;
+    info.minImageCount = desiredImages;
     info.imageFormat = Global::FORMAT; //Assuming we have this
     info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    info.imageExtent = swapchain_size;
+    info.imageExtent = swapchainSize;
     info.imageArrayLayers = 1;
     info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -420,36 +420,36 @@ void make_swapchain()
     else
         std::cout << "Swapchain failed" << std::endl;
 
-    uint32_t img_count;
-    vkGetSwapchainImagesKHR(Global::g_device, Global::g_swapchain, &img_count, nullptr);
-    Global::g_swapchain_images.resize(img_count);
-    Global::g_swapchain_views.resize(img_count);
+    uint32_t imgCount;
+    vkGetSwapchainImagesKHR(Global::g_device, Global::g_swapchain, &imgCount, nullptr);
+    Global::g_swapchain_images.resize(imgCount);
+    Global::g_swapchain_views.resize(imgCount);
     vkGetSwapchainImagesKHR(Global::g_device,
                             Global::g_swapchain,
-                            &img_count,
+                            &imgCount,
                             Global::g_swapchain_images.data());
 
-    for (int i = 0; i < img_count; ++i)
-        init_per_frame(i);
+    for (int i = 0; i < imgCount; ++i)
+        initPerFrame(i);
 
-    for (auto i = 0; i < img_count; ++i) {
-        VkImageViewCreateInfo view_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-        view_info.flags = 0;
-        view_info.image = Global::g_swapchain_images[i];
-        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        view_info.format = Global::FORMAT;
-        view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        view_info.subresourceRange.baseMipLevel = 0;
-        view_info.subresourceRange.levelCount = 1;
-        view_info.subresourceRange.baseArrayLayer = 0;
-        view_info.subresourceRange.layerCount = 1;
+    for (auto i = 0; i < imgCount; ++i) {
+        VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        viewInfo.flags = 0;
+        viewInfo.image = Global::g_swapchain_images[i];
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = Global::FORMAT;
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
 
-        vkCreateImageView(Global::g_device, &view_info, nullptr, &Global::g_swapchain_views[i]);
+        vkCreateImageView(Global::g_device, &viewInfo, nullptr, &Global::g_swapchain_views[i]);
     }
 }
 
-void transition_image_layout(VkCommandBuffer cmd,
-                             VkImage img,
+void transitionImageLayout(VkCommandBuffer cmd,
+                           VkImage img,
                              VkImageLayout oldLayout,
                              VkImageLayout newLayout,
                              VkImageAspectFlags aspectFlags,
@@ -458,92 +458,92 @@ void transition_image_layout(VkCommandBuffer cmd,
                              VkPipelineStageFlags2 srcStage,
                              VkPipelineStageFlags2 dstStage)
 {
-    VkImageMemoryBarrier2 image_barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
-    image_barrier.srcStageMask = srcStage;
-    image_barrier.dstStageMask = dstStage;
-    image_barrier.srcAccessMask = srcAccessMask;
-    image_barrier.dstAccessMask = dstAccessMask;
-    image_barrier.oldLayout = oldLayout;
-    image_barrier.newLayout = newLayout;
-    image_barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    image_barrier.image = img;
-    image_barrier.subresourceRange.aspectMask = aspectFlags;
-    image_barrier.subresourceRange.baseMipLevel = 0;
-    image_barrier.subresourceRange.levelCount = 1;
-    image_barrier.subresourceRange.baseArrayLayer = 0;
-    image_barrier.subresourceRange.layerCount = 1;
+    VkImageMemoryBarrier2 imageBarrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2};
+    imageBarrier.srcStageMask = srcStage;
+    imageBarrier.dstStageMask = dstStage;
+    imageBarrier.srcAccessMask = srcAccessMask;
+    imageBarrier.dstAccessMask = dstAccessMask;
+    imageBarrier.oldLayout = oldLayout;
+    imageBarrier.newLayout = newLayout;
+    imageBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageBarrier.image = img;
+    imageBarrier.subresourceRange.aspectMask = aspectFlags;
+    imageBarrier.subresourceRange.baseMipLevel = 0;
+    imageBarrier.subresourceRange.levelCount = 1;
+    imageBarrier.subresourceRange.baseArrayLayer = 0;
+    imageBarrier.subresourceRange.layerCount = 1;
 
-    VkDependencyInfo dep_info{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
-    dep_info.dependencyFlags = 0;
-    dep_info.imageMemoryBarrierCount = 1;
-    dep_info.pImageMemoryBarriers = &image_barrier;
+    VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    depInfo.dependencyFlags = 0;
+    depInfo.imageMemoryBarrierCount = 1;
+    depInfo.pImageMemoryBarriers = &imageBarrier;
 
-    vkCmdPipelineBarrier2(cmd, &dep_info);
+    vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
 void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *> computePasses)
 {
     auto cmd = Global::g_frame_data[img].buffer;
 
-    VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    vkBeginCommandBuffer(cmd, &begin_info);
+    vkBeginCommandBuffer(cmd, &beginInfo);
 
-    VkClearValue clear_color_value{}, depth_clear_value{};
-    clear_color_value.color = {{0, 0, 0}};
-    depth_clear_value.depthStencil = {1, 0};
+    VkClearValue clearColorValue{}, depthClearValue{};
+    clearColorValue.color = {{0, 0, 0}};
+    depthClearValue.depthStencil = {1, 0};
 
-    VkRenderingAttachmentInfo color_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    color_attachment.imageView = Global::g_render_targets[img].view;
-    color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment.clearValue = clear_color_value;
+    VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    colorAttachment.imageView = Global::g_render_targets[img].view;
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue = clearColorValue;
 
-    VkRenderingAttachmentInfo depth_attachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    depth_attachment.imageView = Global::g_depth.view;
-    depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-    depth_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depth_attachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depth_attachment.clearValue = depth_clear_value;
+    VkRenderingAttachmentInfo depthAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    depthAttachment.imageView = Global::g_depth.view;
+    depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.clearValue = depthClearValue;
 
-    VkRenderingInfo rendering_info{VK_STRUCTURE_TYPE_RENDERING_INFO};
-    rendering_info.renderArea.offset = {0, 0};
-    rendering_info.renderArea.extent.width = Global::WIDTH;
-    rendering_info.renderArea.extent.height = Global::HEIGHT;
-    rendering_info.layerCount = 1;
-    rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachments = &color_attachment;
-    rendering_info.pDepthAttachment = &depth_attachment;
+    VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    renderingInfo.renderArea.offset = {0, 0};
+    renderingInfo.renderArea.extent.width = Global::WIDTH;
+    renderingInfo.renderArea.extent.height = Global::HEIGHT;
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachment;
+    renderingInfo.pDepthAttachment = &depthAttachment;
 
-    transition_image_layout(cmd,
-                            Global::g_depth.image,
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_ASPECT_DEPTH_BIT,
-                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
-                            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-                                | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-                            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
-                            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
-                                | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
+    transitionImageLayout(cmd,
+                          Global::g_depth.image,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                          VK_IMAGE_ASPECT_DEPTH_BIT,
+                          VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
+                          VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                              | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+                          VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
+                          VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
+                              | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
 
     // Transition swapchain to color attachment
-    transition_image_layout(cmd,
-                            Global::g_render_targets[img].image,
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_ASPECT_COLOR_BIT,
-                            0,
-                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                                | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
-                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+    transitionImageLayout(cmd,
+                          Global::g_render_targets[img].image,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                          VK_IMAGE_ASPECT_COLOR_BIT,
+                          0,
+                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                              | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+                          VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
     // Graphic Passes
-    vkCmdBeginRendering(cmd, &rendering_info);
+    vkCmdBeginRendering(cmd, &renderingInfo);
 
     for (auto &pass : graphicsPasses)
         pass->render(&cmd);
@@ -551,32 +551,32 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     vkCmdEndRendering(cmd);
 
     // Transition swapchain to storage
-    transition_image_layout(cmd,
-                            Global::g_render_targets[img].image,
-                            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                            VK_IMAGE_LAYOUT_GENERAL,
-                            VK_IMAGE_ASPECT_COLOR_BIT,
-                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                            VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
-                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
+    transitionImageLayout(cmd,
+                          Global::g_render_targets[img].image,
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                          VK_IMAGE_LAYOUT_GENERAL,
+                          VK_IMAGE_ASPECT_COLOR_BIT,
+                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                          VK_ACCESS_2_SHADER_READ_BIT | VK_ACCESS_2_SHADER_WRITE_BIT,
+                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
     // Compute Passes
     std::vector<Texture> res{{.view = Global::g_render_targets[img].view}};
     for (auto &pass : computePasses) {
-        pass->attach_image_resources(&res);
+        pass->attachImageResources(&res);
         pass->render(&cmd);
     }
 
-    transition_image_layout(cmd,
-                            Global::g_render_targets[img].image,
-                            VK_IMAGE_LAYOUT_GENERAL,
-                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                            VK_IMAGE_ASPECT_COLOR_BIT,
-                            VK_ACCESS_2_SHADER_WRITE_BIT,
-                            VK_ACCESS_2_TRANSFER_READ_BIT,
-                            VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
-                            VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+    transitionImageLayout(cmd,
+                          Global::g_render_targets[img].image,
+                          VK_IMAGE_LAYOUT_GENERAL,
+                          VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                          VK_IMAGE_ASPECT_COLOR_BIT,
+                          VK_ACCESS_2_SHADER_WRITE_BIT,
+                          VK_ACCESS_2_TRANSFER_READ_BIT,
+                          VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                          VK_PIPELINE_STAGE_2_TRANSFER_BIT);
 
     VkImageBlit2 blitRegion{.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr};
 
@@ -606,53 +606,53 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     blitInfo.regionCount = 1;
     blitInfo.pRegions = &blitRegion;
 
-    transition_image_layout(cmd,
-                            Global::g_swapchain_images[img],
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                            VK_IMAGE_ASPECT_COLOR_BIT,
-                            {},
-                            VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                            VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                            VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+    transitionImageLayout(cmd,
+                          Global::g_swapchain_images[img],
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_ASPECT_COLOR_BIT,
+                          {},
+                          VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                          VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_2_TRANSFER_BIT);
 
     vkCmdBlitImage2(cmd, &blitInfo);
 
-    transition_image_layout(cmd,
-                            Global::g_swapchain_images[img],
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                            VK_IMAGE_ASPECT_COLOR_BIT,
-                            VK_ACCESS_2_TRANSFER_WRITE_BIT,
-                            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                            VK_PIPELINE_STAGE_2_TRANSFER_BIT,
-                            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+    transitionImageLayout(cmd,
+                          Global::g_swapchain_images[img],
+                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                          VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                          VK_IMAGE_ASPECT_COLOR_BIT,
+                          VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                          VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
     vkEndCommandBuffer(cmd);
 
     if (Global::g_frame_data[img].releaseSemaphore == VK_NULL_HANDLE) {
-        VkSemaphoreCreateInfo sem_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        VkSemaphoreCreateInfo semInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
         vkCreateSemaphore(Global::g_device,
-                          &sem_info,
+                          &semInfo,
                           nullptr,
                           &Global::g_frame_data[img].releaseSemaphore);
     }
 
-    VkPipelineStageFlags wait_stage{VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT};
+    VkPipelineStageFlags waitStage{VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT};
 
-    VkSubmitInfo sub_info{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-    sub_info.waitSemaphoreCount = 1;
-    sub_info.pWaitSemaphores = &Global::g_frame_data[img].acquireSemaphore;
-    sub_info.pWaitDstStageMask = &wait_stage;
-    sub_info.commandBufferCount = 1;
-    sub_info.pCommandBuffers = &cmd;
-    sub_info.signalSemaphoreCount = 1;
-    sub_info.pSignalSemaphores = &Global::g_frame_data[img].releaseSemaphore;
+    VkSubmitInfo subInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    subInfo.waitSemaphoreCount = 1;
+    subInfo.pWaitSemaphores = &Global::g_frame_data[img].acquireSemaphore;
+    subInfo.pWaitDstStageMask = &waitStage;
+    subInfo.commandBufferCount = 1;
+    subInfo.pCommandBuffers = &cmd;
+    subInfo.signalSemaphoreCount = 1;
+    subInfo.pSignalSemaphores = &Global::g_frame_data[img].releaseSemaphore;
 
-    vkQueueSubmit(Global::g_queue, 1, &sub_info, Global::g_frame_data[img].fence);
+    vkQueueSubmit(Global::g_queue, 1, &subInfo, Global::g_frame_data[img].fence);
 }
 
-VkResult present_image(uint32_t index)
+VkResult presentImage(uint32_t index)
 {
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present.waitSemaphoreCount = 1;
@@ -664,7 +664,7 @@ VkResult present_image(uint32_t index)
     return vkQueuePresentKHR(Global::g_queue, &present);
 }
 
-VkResult acquire_swapchain_image(uint32_t *img)
+VkResult acquireSwapchainImage(uint32_t *img)
 {
     VkSemaphore semaphore;
 
@@ -697,43 +697,43 @@ VkResult acquire_swapchain_image(uint32_t *img)
         vkResetCommandPool(Global::g_device, Global::g_frame_data[*img].pool, 0);
     }
 
-    auto used_semaphore = Global::g_frame_data[*img].acquireSemaphore;
-    if (used_semaphore != VK_NULL_HANDLE)
-        Global::g_semaphores.push_back(used_semaphore);
+    auto usedSemaphore = Global::g_frame_data[*img].acquireSemaphore;
+    if (usedSemaphore != VK_NULL_HANDLE)
+        Global::g_semaphores.push_back(usedSemaphore);
     Global::g_frame_data[*img].acquireSemaphore = semaphore;
 
     return res;
 }
 
-NativeModel make_native_model(Model &model)
+NativeModel makeNativeModel(Model &model)
 {
-    auto vbuffer = make_buffer({sizeof(vertex) * model.mesh.vertices.size(),
+    auto vbuffer = makeBuffer({sizeof(vertex) * model.mesh.vertices.size(),
                                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                     | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
                                model.mesh.vertices.data());
-    auto ibuffer = make_buffer({sizeof(uint16_t) * model.mesh.indices.size(),
+    auto ibuffer = makeBuffer({sizeof(uint16_t) * model.mesh.indices.size(),
                                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
                                     | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
                                model.mesh.indices.data());
 
-    auto model_tex = make_image({model.material.textures[0].width,
+    auto modelTex = makeImage({model.material.textures[0].width,
                                  model.material.textures[0].height,
                                  VK_FORMAT_R8G8B8A8_SRGB,
                                  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                  VK_IMAGE_ASPECT_COLOR_BIT},
                                 &model.material.textures[0]);
 
-    return {vbuffer, ibuffer, model_tex, static_cast<uint32_t>(model.mesh.indices.size())};
+    return {vbuffer, ibuffer, modelTex, static_cast<uint32_t>(model.mesh.indices.size())};
 }
 
-void begin_render_loop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses)
+void beginRenderLoop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses)
 {
     Global::g_gui_thread = std::thread([&]() {
         while (!glfwWindowShouldClose(Global::g_window)) {
             uint32_t frame;
-            auto r = acquire_swapchain_image(&frame);
+            auto r = acquireSwapchainImage(&frame);
 
             if (r != VK_SUCCESS) {
                 vkQueueWaitIdle(Global::g_queue);
@@ -741,7 +741,7 @@ void begin_render_loop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> 
             }
 
             render(frame, graphicsPasses, computePasses);
-            present_image(frame);
+            presentImage(frame);
 
             glfwSwapBuffers(Global::g_window);
             glfwPollEvents();

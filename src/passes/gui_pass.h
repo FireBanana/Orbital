@@ -11,6 +11,6 @@ public:
     void render(VkCommandBuffer *cmd) override;
 
 private:
-    void create_pipeline() override;
+    void createPipeline() override;
 };
 #endif // GUI_PASS_H

@@ -3,8 +3,8 @@
 
 GravityComputePass::GravityComputePass()
 {
-    create_descriptor();
-    create_pipeline();
+    createDescriptor();
+    createPipeline();
     generateData();
 }
 
@@ -12,28 +12,28 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
 {
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 
-    VkDescriptorImageInfo image_info{};
-    image_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    image_info.imageView = m_textures->at(0).view;
-    image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageInfo.imageView = m_textures->at(0).view;
+    imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
-    VkDescriptorBufferInfo buffer_info{};
-    buffer_info.buffer = m_dataBuffer.buffer;
-    buffer_info.range = m_bodies.size() * sizeof(glm::vec4);
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = m_dataBuffer.buffer;
+    bufferInfo.range = m_bodies.size() * sizeof(glm::vec4);
 
-    VkWriteDescriptorSet image_write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    image_write_set.dstBinding = 0;
-    image_write_set.descriptorCount = 1;
-    image_write_set.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    image_write_set.pImageInfo = &image_info;
+    VkWriteDescriptorSet imageWriteSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    imageWriteSet.dstBinding = 0;
+    imageWriteSet.descriptorCount = 1;
+    imageWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    imageWriteSet.pImageInfo = &imageInfo;
 
-    VkWriteDescriptorSet buffer_write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    buffer_write_set.dstBinding = 1;
-    buffer_write_set.descriptorCount = 1;
-    buffer_write_set.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    buffer_write_set.pBufferInfo = &buffer_info;
+    VkWriteDescriptorSet bufferWriteSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+    bufferWriteSet.dstBinding = 1;
+    bufferWriteSet.descriptorCount = 1;
+    bufferWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bufferWriteSet.pBufferInfo = &bufferInfo;
 
-    std::array<VkWriteDescriptorSet, 2> writeSets{image_write_set, buffer_write_set};
+    std::array<VkWriteDescriptorSet, 2> writeSets{imageWriteSet, bufferWriteSet};
 
     vkCmdPushDescriptorSet(*cmd,
                            VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -45,26 +45,26 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
     vkCmdDispatch(*cmd, m_bodies.size(), m_bodies.size(), 1);
 }
 
-void GravityComputePass::create_pipeline()
+void GravityComputePass::createPipeline()
 {
     // VkPushConstantRange range{};
     // range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     // range.offset = 0;
     // range.size = sizeof(UniformConstants);
 
-    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    layout_info.setLayoutCount = 1;
-    layout_info.pSetLayouts = &m_descriptorSetLayout;
+    VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    layoutInfo.setLayoutCount = 1;
+    layoutInfo.pSetLayouts = &m_descriptorSetLayout;
 
-    // layout_info.pushConstantRangeCount = 1;
-    // layout_info.pPushConstantRanges = &range;
+    // layoutInfo.pushConstantRangeCount = 1;
+    // layoutInfo.pPushConstantRanges = &range;
 
-    vkCreatePipelineLayout(Global::g_device, &layout_info, nullptr, &m_pipelineLayout);
+    vkCreatePipelineLayout(Global::g_device, &layoutInfo, nullptr, &m_pipelineLayout);
 
     VkPipelineShaderStageCreateInfo shaderStage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shaderStage.module = get_shader_module(ROOT "shaders/gravity.comp.spv",
-                                           VK_SHADER_STAGE_COMPUTE_BIT);
+    shaderStage.module = getShaderModule(ROOT "shaders/gravity.comp.spv",
+                                         VK_SHADER_STAGE_COMPUTE_BIT);
     shaderStage.pName = "main";
 
     VkComputePipelineCreateInfo computeInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
@@ -76,7 +76,7 @@ void GravityComputePass::create_pipeline()
     //delete shader modules
 }
 
-void GravityComputePass::create_descriptor()
+void GravityComputePass::createDescriptor()
 {
     VkDescriptorSetLayoutBinding binding1;
     binding1.binding = 0;
@@ -116,11 +116,9 @@ void GravityComputePass::generateData()
         glm::vec4(4.503e12f, 0.0f, 0.0f, 1.024e26f)  // Neptune
     };
 
-    m_dataBuffer = make_buffer({m_bodies.size() * sizeof(glm::vec4),
-                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                    | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-                                    | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-                                    | VK_MEMORY_PROPERTY_HOST_CACHED_BIT},
-                               m_bodies.data());
+    m_dataBuffer = makeBuffer({m_bodies.size() * sizeof(glm::vec4),
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                   | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
+                              m_bodies.data());
 }

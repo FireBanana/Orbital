@@ -29,19 +29,19 @@ CudaSample::CudaSample()
            prop.minor);
 
     BufferDescription desc{};
-    desc.buffer_size = 1024;
+    desc.bufferSize = 1024;
     desc.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    auto buffer = make_buffer(desc, nullptr);
+    auto buffer = makeBuffer(desc, nullptr);
 
     cudaExternalMemoryHandleDesc cudaExtMemHandleDesc{};
     cudaExtMemHandleDesc.type = cudaExternalMemoryHandleTypeOpaqueFd;
     //cudaExtMemHandleDesc.handle.fd = getVkImageMemHandle(VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR)
-    cudaExtMemHandleDesc.size = desc.buffer_size;
+    cudaExtMemHandleDesc.size = desc.bufferSize;
     cudaImportExternalMemory(&memBuffer, &cudaExtMemHandleDesc);
 
     cudaExternalMemoryBufferDesc cudaExtMemBufferDesc{};
     cudaExtMemBufferDesc.offset = 0;
-    cudaExtMemBufferDesc.size = desc.buffer_size;
+    cudaExtMemBufferDesc.size = desc.bufferSize;
     cudaExtMemBufferDesc.flags = 0;
     cudaExternalMemoryGetMappedBuffer((void **) &someBuffer, memBuffer, &cudaExtMemBufferDesc);
 

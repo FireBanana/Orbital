@@ -11,9 +11,9 @@ public:
     void render(VkCommandBuffer *cmd) override;
 
 private:
-    void create_pipeline() override;
-    void create_sampler() override;
-    void create_descriptor() override;
+    void createPipeline() override;
+    void createSampler() override;
+    void createDescriptor() override;
 };
 
 #endif // FORWARD_PASS_H

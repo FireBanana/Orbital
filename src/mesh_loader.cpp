@@ -5,7 +5,7 @@
 #include "stb_image.h"
 #include <iostream>
 
-Model MeshLoader::load_model(const std::string &path)
+Model MeshLoader::loadModel(const std::string &path)
 {
     auto file = fastgltf::GltfDataBuffer::FromPath(path);
     fastgltf::Parser parser{};
@@ -24,10 +24,10 @@ Model MeshLoader::load_model(const std::string &path)
 
     std::cout << "model loaded successfully" << std::endl;
 
-    return {load_image(asset), load_mesh(asset)};
+    return {loadImage(asset), loadMesh(asset)};
 }
 
-Mesh MeshLoader::load_mesh(fastgltf::Expected<fastgltf::Asset> &asset)
+Mesh MeshLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
 {
     auto &mesh = asset->meshes[0];
 
@@ -35,48 +35,48 @@ Mesh MeshLoader::load_mesh(fastgltf::Expected<fastgltf::Asset> &asset)
     std::vector<uint16_t> indices;
 
     for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
-        auto position_it = it->findAttribute("POSITION");
-        auto texcoord_it = it->findAttribute("TEXCOORD_0");
-        auto normal_it = it->findAttribute("NORMAL");
+        auto positionIt = it->findAttribute("POSITION");
+        auto texcoordIt = it->findAttribute("TEXCOORD_0");
+        auto normalIt = it->findAttribute("NORMAL");
 
         auto &primitive = *it;
-        auto &position_accessor = asset->accessors[position_it->accessorIndex];
+        auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
 
-        vertices.resize(position_accessor.count);
+        vertices.resize(positionAccessor.count);
 
         fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-            asset.get(), position_accessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+            asset.get(), positionAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
                 vertices[idx].position = {pos.x(), pos.y(), pos.z()};
                 vertices[idx].uv = {};
             });
 
-        auto &texcoord_accessor = asset->accessors[texcoord_it->accessorIndex];
+        auto &texcoordAccessor = asset->accessors[texcoordIt->accessorIndex];
 
         fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset.get(),
-                                                                  texcoord_accessor,
+                                                                  texcoordAccessor,
                                                                   [&](fastgltf::math::fvec2 uv,
                                                                       std::size_t idx) {
                                                                       vertices[idx].uv = {uv.x(),
                                                                                           uv.y()};
                                                                   });
 
-        auto &normal_accessor = asset->accessors[normal_it->accessorIndex];
+        auto &normalAccessor = asset->accessors[normalIt->accessorIndex];
 
         fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-            asset.get(), normal_accessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+            asset.get(), normalAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
                 vertices[idx].normal = {pos.x(), pos.y(), pos.z()};
             });
 
-        auto &index_accessor = asset->accessors[it->indicesAccessor.value()];
-        indices.resize(index_accessor.count);
+        auto &indexAccessor = asset->accessors[it->indicesAccessor.value()];
+        indices.resize(indexAccessor.count);
 
-        fastgltf::copyFromAccessor<uint16_t>(asset.get(), index_accessor, indices.data());
+        fastgltf::copyFromAccessor<uint16_t>(asset.get(), indexAccessor, indices.data());
     }
 
     return {vertices, indices};
 }
 
-std::vector<Image> MeshLoader::load_image(fastgltf::Expected<fastgltf::Asset> &asset)
+std::vector<Image> MeshLoader::loadImage(fastgltf::Expected<fastgltf::Asset> &asset)
 {
     std::vector<Image> result;
 
@@ -111,17 +111,17 @@ std::vector<Image> MeshLoader::load_image(fastgltf::Expected<fastgltf::Asset> &a
                                              data});
                        },
                        [&](fastgltf::sources::BufferView &view) {
-                           auto &buffer_view = asset->bufferViews[view.bufferViewIndex];
-                           auto &buffer = asset->buffers[buffer_view.bufferIndex];
+                           auto &bufferView = asset->bufferViews[view.bufferViewIndex];
+                           auto &buffer = asset->buffers[bufferView.bufferIndex];
 
-                           auto array_fn = [&](fastgltf::sources::Array &vec) {
+                           auto arrayFn = [&](fastgltf::sources::Array &vec) {
                                int width, height, channels;
 
                                auto *data = stbi_load_from_memory(reinterpret_cast<const stbi_uc *>(
                                                                       vec.bytes.data()
-                                                                      + buffer_view.byteOffset),
+                                                                      + bufferView.byteOffset),
                                                                   static_cast<int>(
-                                                                      buffer_view.byteLength),
+                                                                      bufferView.byteLength),
                                                                   &width,
                                                                   &height,
                                                                   &channels,
@@ -133,7 +133,7 @@ std::vector<Image> MeshLoader::load_image(fastgltf::Expected<fastgltf::Asset> &a
                                                  data});
                            };
 
-                           std::visit(fastgltf::visitor{[](auto &arg) {}, array_fn}, buffer.data);
+                           std::visit(fastgltf::visitor{[](auto &arg) {}, arrayFn}, buffer.data);
                        }},
                    i.data);
     }

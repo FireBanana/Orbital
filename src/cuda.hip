@@ -14,7 +14,7 @@ CudaSample::CudaSample()
     hipSetDevice(0);
     hipStreamCreate(&stream);
 
-    auto someMemory = make_buffer({1024,
+    auto someMemory = makeBuffer({1024,
                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT
                                        | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT

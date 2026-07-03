@@ -49,7 +49,7 @@ struct BufferData
 
 struct BufferDescription
 {
-    VkDeviceSize buffer_size;
+    VkDeviceSize bufferSize;
     VkBufferUsageFlags usage;
     VkMemoryPropertyFlags memProperty;
 };
@@ -58,7 +58,7 @@ struct Buffer
 {
     VkDeviceMemory memory;
     VkBuffer buffer;
-    void *mapped_data;
+    void *mappedData;
 };
 
 struct Texture
@@ -68,7 +68,7 @@ struct Texture
     VkImageView view;
     VkSampler sampler;
     VkExtent2D extent;
-    uint32_t mip_levels;
+    uint32_t mipLevels;
 };
 
 struct NativeModel
@@ -76,48 +76,48 @@ struct NativeModel
     Buffer vertex;
     Buffer index;
     Texture texture;
-    uint32_t index_count;
+    uint32_t indexCount;
     vec3 position = {0, 0, 0};
 };
 
-uint32_t find_memory_type(VkPhysicalDevice phy_device,
-                          uint32_t filter_type,
-                          VkMemoryPropertyFlags props);
+uint32_t findMemoryType(VkPhysicalDevice phyDevice,
+                        uint32_t filterType,
+                        VkMemoryPropertyFlags props);
 
-VkShaderModule get_shader_module(const std::string path, VkShaderStageFlagBits bits);
+VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bits);
 
-void make_instance();
+void makeInstance();
 
-void make_device();
+void makeDevice();
 
-Buffer make_buffer(BufferDescription desc, void *data = nullptr);
+Buffer makeBuffer(BufferDescription desc, void *data = nullptr);
 
-void init_per_frame(int index);
+void initPerFrame(int index);
 
-Texture make_image(TextureDescription desc, Image *image = nullptr);
+Texture makeImage(TextureDescription desc, Image *image = nullptr);
 
-void make_swapchain();
+void makeSwapchain();
 
-void make_render_target();
+void makeRenderTarget();
 
-void transition_image_layout(VkCommandBuffer cmd,
-                             VkImage img,
-                             VkImageLayout oldLayout,
-                             VkImageLayout newLayout,
-                             VkImageAspectFlags flags,
-                             VkAccessFlags2 srcAccessMask,
-                             VkAccessFlags2 dstAccessMask,
-                             VkPipelineStageFlags2 srcStage,
-                             VkPipelineStageFlags2 dstStage);
+void transitionImageLayout(VkCommandBuffer cmd,
+                           VkImage img,
+                           VkImageLayout oldLayout,
+                           VkImageLayout newLayout,
+                           VkImageAspectFlags flags,
+                           VkAccessFlags2 srcAccessMask,
+                           VkAccessFlags2 dstAccessMask,
+                           VkPipelineStageFlags2 srcStage,
+                           VkPipelineStageFlags2 dstStage);
 
 void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *> computePasses);
 
-VkResult present_image(uint32_t index);
+VkResult presentImage(uint32_t index);
 
-VkResult acquire_swapchain_image(uint32_t *img);
+VkResult acquireSwapchainImage(uint32_t *img);
 
-NativeModel make_native_model(Model &model);
+NativeModel makeNativeModel(Model &model);
 
-void begin_render_loop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses);
+void beginRenderLoop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses);
 
 #endif // GRAPHICS_H

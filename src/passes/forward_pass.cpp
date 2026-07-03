@@ -4,9 +4,9 @@
 
 ForwardPass::ForwardPass()
 {
-    create_sampler();
-    create_descriptor();
-    create_pipeline();
+    createSampler();
+    createDescriptor();
+    createPipeline();
 }
 
 void ForwardPass::render(VkCommandBuffer *cmd)
@@ -62,51 +62,51 @@ void ForwardPass::render(VkCommandBuffer *cmd)
             vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
             vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT16);
 
-            VkDescriptorImageInfo image_info{};
-            image_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            image_info.imageView = model.texture.view;
-            image_info.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = model.texture.view;
+            imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
-            VkWriteDescriptorSet write_set{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-            write_set.dstBinding = 0;
-            write_set.descriptorCount = 1;
-            write_set.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            write_set.pImageInfo = &image_info;
+            VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writeSet.dstBinding = 0;
+            writeSet.descriptorCount = 1;
+            writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            writeSet.pImageInfo = &imageInfo;
 
             vkCmdPushDescriptorSet(*cmd,
                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
                                    m_pipelineLayout,
                                    0,
                                    1,
-                                   &write_set);
+                                   &writeSet);
 
-            vkCmdDrawIndexed(*cmd, model.index_count, 1, 0, 0, 0);
+            vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
         }
     }
 }
 
-void ForwardPass::create_pipeline()
+void ForwardPass::createPipeline()
 {
     VkPushConstantRange range{};
     range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     range.offset = 0;
     range.size = sizeof(UniformConstants);
 
-    VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    layout_info.setLayoutCount = 1;
-    layout_info.pSetLayouts = &m_descriptorSetLayout;
+    VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+    layoutInfo.setLayoutCount = 1;
+    layoutInfo.pSetLayouts = &m_descriptorSetLayout;
 
-    layout_info.pushConstantRangeCount = 1;
-    layout_info.pPushConstantRanges = &range;
+    layoutInfo.pushConstantRangeCount = 1;
+    layoutInfo.pPushConstantRanges = &range;
 
-    vkCreatePipelineLayout(Global::g_device, &layout_info, nullptr, &m_pipelineLayout);
+    vkCreatePipelineLayout(Global::g_device, &layoutInfo, nullptr, &m_pipelineLayout);
 
-    VkVertexInputBindingDescription binding_desc{};
-    binding_desc.binding = 0;
-    binding_desc.stride = sizeof(vertex);
-    binding_desc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    VkVertexInputBindingDescription bindingDesc{};
+    bindingDesc.binding = 0;
+    bindingDesc.stride = sizeof(vertex);
+    bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-    std::array<VkVertexInputAttributeDescription, 3> attr_description = {{
+    std::array<VkVertexInputAttributeDescription, 3> attrDescription = {{
         {.location = 0,
          .binding = 0,
          .format = VK_FORMAT_R32G32B32_SFLOAT,
@@ -121,87 +121,87 @@ void ForwardPass::create_pipeline()
          .offset = offsetof(vertex, uv)},
     }};
 
-    VkPipelineVertexInputStateCreateInfo vertex_state_info{
+    VkPipelineVertexInputStateCreateInfo vertexStateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-    vertex_state_info.vertexBindingDescriptionCount = 1;
-    vertex_state_info.vertexAttributeDescriptionCount = (uint32_t) attr_description.size();
-    vertex_state_info.pVertexBindingDescriptions = &binding_desc;
-    vertex_state_info.pVertexAttributeDescriptions = attr_description.data();
+    vertexStateInfo.vertexBindingDescriptionCount = 1;
+    vertexStateInfo.vertexAttributeDescriptionCount = (uint32_t) attrDescription.size();
+    vertexStateInfo.pVertexBindingDescriptions = &bindingDesc;
+    vertexStateInfo.pVertexAttributeDescriptions = attrDescription.data();
 
-    VkPipelineInputAssemblyStateCreateInfo input_assembly{
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-    input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    input_assembly.primitiveRestartEnable = false;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssembly.primitiveRestartEnable = false;
 
-    VkPipelineRasterizationStateCreateInfo raster_info{
+    VkPipelineRasterizationStateCreateInfo rasterInfo{
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-    raster_info.depthClampEnable = false;
-    raster_info.rasterizerDiscardEnable = false;
-    raster_info.polygonMode = VK_POLYGON_MODE_FILL;
-    raster_info.depthBiasEnable = false;
-    raster_info.lineWidth = 1.0;
+    rasterInfo.depthClampEnable = false;
+    rasterInfo.rasterizerDiscardEnable = false;
+    rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterInfo.depthBiasEnable = false;
+    rasterInfo.lineWidth = 1.0;
 
-    std::vector<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
+    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
                                                   VK_DYNAMIC_STATE_SCISSOR,
                                                   VK_DYNAMIC_STATE_CULL_MODE};
 
-    VkPipelineColorBlendAttachmentState blend_attachment{};
-    blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
+    VkPipelineColorBlendAttachmentState blendAttachment{};
+    blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
                                       | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
-    VkPipelineColorBlendStateCreateInfo blend_state_info{
+    VkPipelineColorBlendStateCreateInfo blendStateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-    blend_state_info.attachmentCount = 1;
-    blend_state_info.pAttachments = &blend_attachment;
+    blendStateInfo.attachmentCount = 1;
+    blendStateInfo.pAttachments = &blendAttachment;
 
-    VkPipelineViewportStateCreateInfo viewport_state{
+    VkPipelineViewportStateCreateInfo viewportState{
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-    viewport_state.viewportCount = 1;
-    viewport_state.scissorCount = 1;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
 
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_state{
+    VkPipelineDepthStencilStateCreateInfo depthStencilState{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
-    depth_stencil_state.depthTestEnable = VK_TRUE;
-    depth_stencil_state.depthWriteEnable = VK_TRUE;
+    depthStencilState.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depthStencilState.depthTestEnable = VK_TRUE;
+    depthStencilState.depthWriteEnable = VK_TRUE;
 
-    VkPipelineMultisampleStateCreateInfo multisample_state{
+    VkPipelineMultisampleStateCreateInfo multisampleState{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-    multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
-    VkPipelineDynamicStateCreateInfo dynamic_state_info{
+    VkPipelineDynamicStateCreateInfo dynamicStateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-    dynamic_state_info.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
-    dynamic_state_info.pDynamicStates = dynamic_states.data();
+    dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
+    dynamicStateInfo.pDynamicStates = dynamicStates.data();
 
-    std::array<VkPipelineShaderStageCreateInfo, 2> shader_stages = {
+    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
         {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = get_shader_module(ROOT "shaders/triangle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+          .module = getShaderModule(ROOT "shaders/triangle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
           .pName = "main"},
          {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = get_shader_module(ROOT "shaders/triangle.frag.spv",
-                                      VK_SHADER_STAGE_FRAGMENT_BIT),
+          .module = getShaderModule(ROOT "shaders/triangle.frag.spv",
+                                    VK_SHADER_STAGE_FRAGMENT_BIT),
           .pName = "main"}}};
 
-    VkPipelineRenderingCreateInfo rendering_info{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-    rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachmentFormats = &Global::RENDER_TARGET_FORMAT;
-    rendering_info.depthAttachmentFormat = Global::DEPTH_FORMAT;
+    VkPipelineRenderingCreateInfo renderingInfo{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachmentFormats = &Global::RENDER_TARGET_FORMAT;
+    renderingInfo.depthAttachmentFormat = Global::DEPTH_FORMAT;
 
     VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-    info.pNext = &rendering_info;
-    info.stageCount = static_cast<uint32_t>(shader_stages.size());
-    info.pStages = shader_stages.data();
-    info.pVertexInputState = &vertex_state_info;
-    info.pInputAssemblyState = &input_assembly;
-    info.pViewportState = &viewport_state;
-    info.pRasterizationState = &raster_info;
-    info.pMultisampleState = &multisample_state;
-    info.pDepthStencilState = &depth_stencil_state;
-    info.pColorBlendState = &blend_state_info;
-    info.pDynamicState = &dynamic_state_info;
+    info.pNext = &renderingInfo;
+    info.stageCount = static_cast<uint32_t>(shaderStages.size());
+    info.pStages = shaderStages.data();
+    info.pVertexInputState = &vertexStateInfo;
+    info.pInputAssemblyState = &inputAssembly;
+    info.pViewportState = &viewportState;
+    info.pRasterizationState = &rasterInfo;
+    info.pMultisampleState = &multisampleState;
+    info.pDepthStencilState = &depthStencilState;
+    info.pColorBlendState = &blendStateInfo;
+    info.pDynamicState = &dynamicStateInfo;
     info.layout = m_pipelineLayout;
     info.renderPass = VK_NULL_HANDLE;
     info.subpass = 0;
@@ -210,13 +210,13 @@ void ForwardPass::create_pipeline()
 
     //delete shader modules
 };
-void ForwardPass::create_sampler()
+void ForwardPass::createSampler()
 {
     VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
     vkCreateSampler(Global::g_device, &info, nullptr, &m_sampler);
 }
 
-void ForwardPass::create_descriptor()
+void ForwardPass::createDescriptor()
 {
     VkDescriptorSetLayoutBinding binding;
     binding.binding = 0;

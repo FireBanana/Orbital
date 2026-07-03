@@ -20,8 +20,8 @@ int main()
     if (!Global::g_window)
         throw;
 
-    make_instance();
-    make_device();
+    makeInstance();
+    makeDevice();
 
     if (auto res = glfwCreateWindowSurface(Global::g_instance,
                                            Global::g_window,
@@ -32,16 +32,16 @@ int main()
     else
         std::cout << "Surface creation failed " << res << std::endl;
 
-    make_swapchain();
-    make_render_target();
+    makeSwapchain();
+    makeRenderTarget();
 
-    Global::g_depth = make_image({Global::WIDTH,
+    Global::g_depth = makeImage({Global::WIDTH,
                                   Global::HEIGHT,
                                   Global::DEPTH_FORMAT,
                                   VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                                   VK_IMAGE_ASPECT_DEPTH_BIT});
 
-    //ui_pipeline::create_pipeline();
+    //ui_pipeline::createPipeline();
 
     glfwMakeContextCurrent(Global::g_window);
 
@@ -49,11 +49,11 @@ int main()
 
     struct WindowState
     {
-        bool new_click;
-        bool is_pressed;
-        double x_delta = 0.0;
-        double y_delta = 0.0;
-        double camera_distance = Global::g_camera_position.z;
+        bool newClick;
+        bool isPressed;
+        double xDelta = 0.0;
+        double yDelta = 0.0;
+        double cameraDistance = Global::g_camera_position.z;
     } state;
 
     glfwSetWindowUserPointer(Global::g_window, &state);
@@ -65,67 +65,67 @@ int main()
 
                                    if (button == GLFW_MOUSE_BUTTON_LEFT) {
                                        if (action == GLFW_PRESS) {
-                                           state->is_pressed = true;
-                                           state->new_click = true;
+                                           state->isPressed = true;
+                                           state->newClick = true;
                                        } else if (action == GLFW_RELEASE) {
-                                           state->is_pressed = false;
+                                           state->isPressed = false;
                                        }
                                    }
                                });
 
     glfwSetCursorPosCallback(Global::g_window, [](GLFWwindow *window, double xpos, double ypos) {
-        static double last_x_position = xpos, last_y_position = ypos;
+        static double lastXPosition = xpos, lastYPosition = ypos;
 
         auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
 
-        if (!state->is_pressed)
+        if (!state->isPressed)
             return;
 
-        if (state->new_click) {
-            last_x_position = xpos;
-            last_y_position = ypos;
-            state->new_click = false;
+        if (state->newClick) {
+            lastXPosition = xpos;
+            lastYPosition = ypos;
+            state->newClick = false;
         }
 
-        state->x_delta -= xpos - last_x_position;
-        state->y_delta += ypos - last_y_position;
-        state->y_delta = glm::clamp(state->y_delta, -130.0 + 0.01, 130.0 - 0.01);
+        state->xDelta -= xpos - lastXPosition;
+        state->yDelta += ypos - lastYPosition;
+        state->yDelta = glm::clamp(state->yDelta, -130.0 + 0.01, 130.0 - 0.01);
 
         Global::g_camera_position
-            = glm::vec3(state->camera_distance
-                            * (glm::sin(state->x_delta * 0.01) * glm::cos(state->y_delta * 0.01)),
-                        state->camera_distance * (glm::sin(state->y_delta * 0.01)),
-                        state->camera_distance
-                            * (glm::cos(state->x_delta * 0.01) * glm::cos(state->y_delta * 0.01)));
+            = glm::vec3(state->cameraDistance
+                            * (glm::sin(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)),
+                        state->cameraDistance * (glm::sin(state->yDelta * 0.01)),
+                        state->cameraDistance
+                            * (glm::cos(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)));
 
-        last_x_position = xpos;
-        last_y_position = ypos;
+        lastXPosition = xpos;
+        lastYPosition = ypos;
     });
 
     glfwSetScrollCallback(Global::g_window, [](GLFWwindow *window, double xoffset, double yoffset) {
         auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
 
-        state->camera_distance -= yoffset * 0.2;
+        state->cameraDistance -= yoffset * 0.2;
 
         Global::g_camera_position
-            = glm::vec3(state->camera_distance
-                            * (glm::sin(state->x_delta * 0.01) * glm::cos(state->y_delta * 0.01)),
-                        state->camera_distance * (glm::sin(state->y_delta * 0.01)),
-                        state->camera_distance
-                            * (glm::cos(state->x_delta * 0.01) * glm::cos(state->y_delta * 0.01)));
+            = glm::vec3(state->cameraDistance
+                            * (glm::sin(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)),
+                        state->cameraDistance * (glm::sin(state->yDelta * 0.01)),
+                        state->cameraDistance
+                            * (glm::cos(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)));
     });
 
-    ForwardPass f_pass{};
-    GuiPass g_pass{};
-    GravityComputePass gc_pass{};
+    ForwardPass fPass{};
+    GuiPass gPass{};
+    GravityComputePass gcPass{};
 
     // ===== Load assets ======
 
-    auto earth_asset = MeshLoader::load_model(ROOT "assets/earth.glb");
-    auto monkey_asset = MeshLoader::load_model(ROOT "assets/monkey.glb");
+    auto earthAsset = MeshLoader::loadModel(ROOT "assets/earth.glb");
+    auto monkeyAsset = MeshLoader::loadModel(ROOT "assets/monkey.glb");
 
-    auto monkey = make_native_model(monkey_asset);
-    auto earth = make_native_model(earth_asset);
+    auto monkey = makeNativeModel(monkeyAsset);
+    auto earth = makeNativeModel(earthAsset);
 
     std::vector<NativeModel> renderables{50};
 
@@ -138,19 +138,19 @@ int main()
 
     std::vector<Texture> computeResources{earth.texture};
 
-    f_pass.attach_models(&renderables);
+    fPass.attachModels(&renderables);
 
     // ========================
-    std::vector<Pass *> passes = {&f_pass, &g_pass};
-    std::vector<Pass *> cPasses = {&gc_pass};
+    std::vector<Pass *> passes = {&fPass, &gPass};
+    std::vector<Pass *> cPasses = {&gcPass};
 
-    begin_render_loop(passes, cPasses);
+    beginRenderLoop(passes, cPasses);
 
-    constexpr double min_distance = 3.0, max_distance = 10.0;
-    constexpr double min_speed = 0.000001, max_speed = 0.0001;
+    constexpr double minDistance = 3.0, maxDistance = 10.0;
+    constexpr double minSpeed = 0.000001, maxSpeed = 0.0001;
     std::mt19937 mt{};
-    std::uniform_real_distribution<double> distance_distribution{min_distance, max_distance};
-    std::uniform_real_distribution<double> speed_distribution{min_speed, max_speed};
+    std::uniform_real_distribution<double> distanceDistribution{minDistance, maxDistance};
+    std::uniform_real_distribution<double> speedDistribution{minSpeed, maxSpeed};
 
     struct GameObjectPlanet
     {
@@ -158,46 +158,46 @@ int main()
         double speed;
     };
 
-    std::vector<GameObjectPlanet> game_objects{renderables.size()};
+    std::vector<GameObjectPlanet> gameObjects{renderables.size()};
 
-    double total_distance = 0.0;
+    double totalDistance = 0.0;
 
-    for (auto i = 1; i < game_objects.size(); ++i) {
-        game_objects[i].distance = total_distance + distance_distribution(mt);
-        game_objects[i].speed = speed_distribution(mt);
+    for (auto i = 1; i < gameObjects.size(); ++i) {
+        gameObjects[i].distance = totalDistance + distanceDistribution(mt);
+        gameObjects[i].speed = speedDistribution(mt);
 
-        total_distance = game_objects[i].distance;
+        totalDistance = gameObjects[i].distance;
     }
 
-    auto get_time = []() {};
+    auto getTime = []() {};
 
     uint64_t frame = 0;
 
     double t = 0.0;
     double dt = 1 / 60.0;
-    auto curr_time = std::chrono::high_resolution_clock::now();
+    auto currTime = std::chrono::high_resolution_clock::now();
 
     // Main loop
     while (1) {
         if (!Global::g_window_running)
             break;
 
-        auto new_time = std::chrono::high_resolution_clock::now();
-        auto frame_time = std::chrono::duration<double, std::milli>(new_time - curr_time).count();
-        curr_time = new_time;
+        auto newTime = std::chrono::high_resolution_clock::now();
+        auto frameTime = std::chrono::duration<double, std::milli>(newTime - currTime).count();
+        currTime = newTime;
 
-        while (frame_time > 0.0) {
-            float delta = std::min(frame_time, dt);
+        while (frameTime > 0.0) {
+            float delta = std::min(frameTime, dt);
 
             for (auto i = 1; i < renderables.size(); ++i) {
-                renderables[i].position = {static_cast<float>(glm::sin(game_objects[i].speed * t)
-                                                              * game_objects[i].distance),
+                renderables[i].position = {static_cast<float>(glm::sin(gameObjects[i].speed * t)
+                                                              * gameObjects[i].distance),
                                            0.0,
-                                           static_cast<float>(glm::cos(game_objects[i].speed * t)
-                                                              * game_objects[i].distance)};
+                                           static_cast<float>(glm::cos(gameObjects[i].speed * t)
+                                                              * gameObjects[i].distance)};
             }
 
-            frame_time -= delta;
+            frameTime -= delta;
             t += delta;
         }
 
