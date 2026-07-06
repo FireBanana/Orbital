@@ -43,6 +43,25 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
                            writeSets.data());
 
     vkCmdDispatch(*cmd, m_bodies.size(), m_bodies.size(), 1);
+
+    transitionBuffer(*cmd,
+                     m_dataBuffer.buffer,
+                     VK_ACCESS_2_SHADER_WRITE_BIT,
+                     VK_ACCESS_2_TRANSFER_READ_BIT,
+                     VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
+                     VK_PIPELINE_STAGE_2_COPY_BIT);
+
+    VkBufferCopy copyRegion{};
+    copyRegion.size = m_bodies.size() * sizeof(glm::vec4);
+
+    vkCmdCopyBuffer(*cmd, m_dataBuffer.buffer, m_readBuffer.buffer, 1, &copyRegion);
+
+    transitionBuffer(*cmd,
+                     m_dataBuffer.buffer,
+                     VK_ACCESS_2_SHADER_WRITE_BIT,
+                     VK_ACCESS_2_TRANSFER_READ_BIT,
+                     VK_PIPELINE_STAGE_2_COPY_BIT,
+                     VK_PIPELINE_STAGE_2_HOST_BIT);
 }
 
 void GravityComputePass::createPipeline()
@@ -117,8 +136,11 @@ void GravityComputePass::generateData()
     };
 
     m_dataBuffer = makeBuffer({m_bodies.size() * sizeof(glm::vec4),
-                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-                               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                   | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                               m_bodies.data());
+
+    m_readBuffer = makeBuffer({m_bodies.size() * sizeof(glm::vec4),
+                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT});
 }

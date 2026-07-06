@@ -176,8 +176,53 @@ Buffer makeBuffer(BufferDescription desc, void *data)
 
     vkBindBufferMemory(Global::g_device, result.buffer, result.memory, 0);
 
+    // Should also handle cases where its both host and local, or at least output error
     if (data != nullptr && desc.memProperty & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
-        //TODO: implement
+        auto buffer = makeBuffer({desc.bufferSize,
+                                  VK_BUFFER_USAGE_2_TRANSFER_SRC_BIT,
+                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                                      | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
+                                 data);
+
+        VkBufferCopy copyRegion{};
+        copyRegion.size = desc.bufferSize;
+
+        VkCommandPoolCreateInfo poolInfo{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolInfo.queueFamilyIndex = static_cast<uint32_t>(Global::QUEUE_INDEX);
+
+        VkCommandPool pool;
+        vkCreateCommandPool(Global::g_device, &poolInfo, nullptr, &pool);
+
+        VkCommandBufferAllocateInfo bufInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        bufInfo.commandPool = pool;
+        bufInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        bufInfo.commandBufferCount = 1;
+
+        VkCommandBuffer cmd;
+        vkAllocateCommandBuffers(Global::g_device, &bufInfo, &cmd);
+
+        VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        vkBeginCommandBuffer(cmd, &beginInfo);
+
+        vkCmdCopyBuffer(cmd, buffer.buffer, result.buffer, 1, &copyRegion);
+
+        vkEndCommandBuffer(cmd);
+
+        VkFence stagingFence;
+        VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        vkCreateFence(Global::g_device, &fenceInfo, nullptr, &stagingFence);
+
+        VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &cmd;
+        submitInfo.signalSemaphoreCount = 0;
+        vkQueueSubmit(Global::g_queue, 1, &submitInfo, stagingFence);
+
+        vkWaitForFences(Global::g_device, 1, &stagingFence, VK_TRUE, UINT64_MAX);
+
     } else if (data != nullptr) {
         vkMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
         memcpy(result.mappedData, data, (size_t) desc.bufferSize);
@@ -478,6 +523,31 @@ void transitionImageLayout(VkCommandBuffer cmd,
     depInfo.dependencyFlags = 0;
     depInfo.imageMemoryBarrierCount = 1;
     depInfo.pImageMemoryBarriers = &imageBarrier;
+
+    vkCmdPipelineBarrier2(cmd, &depInfo);
+}
+
+void transitionBuffer(VkCommandBuffer cmd,
+                      VkBuffer buffer,
+                      VkAccessFlags2 srcAccess,
+                      VkAccessFlags2 dstAccess,
+                      VkPipelineStageFlags2 srcStage,
+                      VkPipelineStageFlags2 dstStage)
+{
+    VkBufferMemoryBarrier2 barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2};
+    barrier.srcStageMask = srcStage;
+    barrier.srcAccessMask = srcAccess;
+    barrier.dstStageMask = dstStage;
+    barrier.dstAccessMask = dstAccess;
+    barrier.buffer = buffer;
+    barrier.size = VK_WHOLE_SIZE;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+    VkDependencyInfo depInfo{VK_STRUCTURE_TYPE_DEPENDENCY_INFO};
+    depInfo.dependencyFlags = 0;
+    depInfo.bufferMemoryBarrierCount = 1;
+    depInfo.pBufferMemoryBarriers = &barrier;
 
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }

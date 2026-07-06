@@ -110,6 +110,13 @@ void transitionImageLayout(VkCommandBuffer cmd,
                            VkPipelineStageFlags2 srcStage,
                            VkPipelineStageFlags2 dstStage);
 
+void transitionBuffer(VkCommandBuffer cmd,
+                      VkBuffer buffer,
+                      VkAccessFlags2 srcAccess,
+                      VkAccessFlags2 dstAccess,
+                      VkPipelineStageFlags2 srcStage,
+                      VkPipelineStageFlags2 dstStage);
+
 void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *> computePasses);
 
 VkResult presentImage(uint32_t index);

@@ -18,6 +18,7 @@ private:
 
     std::vector<glm::vec4> m_bodies;
     Buffer m_dataBuffer;
+    Buffer m_readBuffer;
 };
 
 #endif // N_BODY_COMPUTE_H

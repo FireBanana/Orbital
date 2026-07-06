@@ -45,4 +45,6 @@ void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 
     // Average the accumulated colors
     //renderTarget[pos] = colorSum / SAMPLE_COUNT;
+
+    //renderTarget[pos] = planet1;
 }
