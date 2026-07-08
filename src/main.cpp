@@ -43,7 +43,7 @@ int main()
 
     //ui_pipeline::createPipeline();
 
-    glfwMakeContextCurrent(Global::g_window);
+    //glfwMakeContextCurrent(Global::g_window);
 
     glfwShowWindow(Global::g_window);
 
@@ -174,7 +174,7 @@ int main()
     uint64_t frame = 0;
 
     double t = 0.0;
-    double dt = 1 / 60.0;
+    double dt = 1000 / 60.0;
     auto currTime = std::chrono::high_resolution_clock::now();
 
     // Main loop
@@ -202,6 +202,7 @@ int main()
         }
 
         frame++;
+        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(dt));
     }
 
     Global::g_gui_thread.join();

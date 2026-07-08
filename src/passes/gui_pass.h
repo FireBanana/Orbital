@@ -8,7 +8,7 @@ class GuiPass : public Pass
 public:
     GuiPass();
 
-    void render(VkCommandBuffer *cmd) override;
+    void render(VkCommandBuffer *cmd, uint32_t imgIndex) override;
 
 private:
     void createPipeline() override;

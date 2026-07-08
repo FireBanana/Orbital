@@ -101,9 +101,7 @@ void makeDevice()
     // Assume we pick queue 0
 
     float priority = 0.5;
-    const char *extensions[] = {"VK_KHR_swapchain",
-                                "VK_KHR_dynamic_rendering",
-                                "VK_EXT_descriptor_buffer"};
+    const char *extensions[] = {"VK_KHR_swapchain"};
 
     VkPhysicalDeviceVulkan14Features
         enableVulkan14Features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
@@ -136,7 +134,7 @@ void makeDevice()
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueInfo;
     deviceInfo.ppEnabledExtensionNames = extensions;
-    deviceInfo.enabledExtensionCount = 3;
+    deviceInfo.enabledExtensionCount = 1;
 
     if (vkCreateDevice(devices[0], &deviceInfo, nullptr, &Global::g_device) == VK_SUCCESS)
         std::cout << "Created device" << std::endl;
@@ -207,7 +205,21 @@ Buffer makeBuffer(BufferDescription desc, void *data)
 
         vkBeginCommandBuffer(cmd, &beginInfo);
 
+        transitionBuffer(cmd,
+                         result.buffer,
+                         {},
+                         VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                         VK_PIPELINE_STAGE_2_HOST_BIT,
+                         VK_PIPELINE_STAGE_2_TRANSFER_BIT);
+
         vkCmdCopyBuffer(cmd, buffer.buffer, result.buffer, 1, &copyRegion);
+
+        transitionBuffer(cmd,
+                         result.buffer,
+                         VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                         VK_ACCESS_2_SHADER_WRITE_BIT,
+                         VK_PIPELINE_STAGE_2_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
         vkEndCommandBuffer(cmd);
 
@@ -222,7 +234,12 @@ Buffer makeBuffer(BufferDescription desc, void *data)
         vkQueueSubmit(Global::g_queue, 1, &submitInfo, stagingFence);
 
         vkWaitForFences(Global::g_device, 1, &stagingFence, VK_TRUE, UINT64_MAX);
-
+    } else if (data == nullptr
+               && desc.memProperty
+                      & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+                         | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
+        vkMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
+        // Needs to be unmapped at some point?
     } else if (data != nullptr) {
         vkMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
         memcpy(result.mappedData, data, (size_t) desc.bufferSize);
@@ -616,7 +633,7 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     vkCmdBeginRendering(cmd, &renderingInfo);
 
     for (auto &pass : graphicsPasses)
-        pass->render(&cmd);
+        pass->render(&cmd, img);
 
     vkCmdEndRendering(cmd);
 
@@ -635,7 +652,7 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     std::vector<Texture> res{{.view = Global::g_render_targets[img].view}};
     for (auto &pass : computePasses) {
         pass->attachImageResources(&res);
-        pass->render(&cmd);
+        pass->render(&cmd, img);
     }
 
     transitionImageLayout(cmd,
@@ -720,6 +737,11 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     subInfo.pSignalSemaphores = &Global::g_frame_data[img].releaseSemaphore;
 
     vkQueueSubmit(Global::g_queue, 1, &subInfo, Global::g_frame_data[img].fence);
+
+    // Readback data
+    for (auto &pass : computePasses) {
+        pass->read(img);
+    }
 }
 
 VkResult presentImage(uint32_t index)
@@ -753,7 +775,7 @@ VkResult acquireSwapchainImage(uint32_t *img)
                                      VK_NULL_HANDLE,
                                      img);
 
-    if (res != VK_SUCCESS) {
+    if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
         Global::g_semaphores.push_back(semaphore);
         return res;
     }
@@ -778,15 +800,13 @@ VkResult acquireSwapchainImage(uint32_t *img)
 NativeModel makeNativeModel(Model &model)
 {
     auto vbuffer = makeBuffer({sizeof(vertex) * model.mesh.vertices.size(),
-                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                    | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
-                               model.mesh.vertices.data());
+                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                              model.mesh.vertices.data());
     auto ibuffer = makeBuffer({sizeof(uint16_t) * model.mesh.indices.size(),
-                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
-                                    | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT},
-                               model.mesh.indices.data());
+                               VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                              model.mesh.indices.data());
 
     auto modelTex = makeImage({model.material.textures[0].width,
                                  model.material.textures[0].height,
@@ -813,7 +833,7 @@ void beginRenderLoop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &c
             render(frame, graphicsPasses, computePasses);
             presentImage(frame);
 
-            glfwSwapBuffers(Global::g_window);
+            //glfwSwapBuffers(Global::g_window);
             glfwPollEvents();
         }
 

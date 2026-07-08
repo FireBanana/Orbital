@@ -1,5 +1,6 @@
 #include "n_body_compute.h"
 #include "../global.h"
+#include <iostream>
 
 GravityComputePass::GravityComputePass()
 {
@@ -8,7 +9,7 @@ GravityComputePass::GravityComputePass()
     generateData();
 }
 
-void GravityComputePass::render(VkCommandBuffer *cmd)
+void GravityComputePass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
 
@@ -18,7 +19,7 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
     imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
     VkDescriptorBufferInfo bufferInfo{};
-    bufferInfo.buffer = m_dataBuffer.buffer;
+    bufferInfo.buffer = m_dataBuffer[imgIndex].buffer;
     bufferInfo.range = m_bodies.size() * sizeof(glm::vec4);
 
     VkWriteDescriptorSet imageWriteSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -45,8 +46,8 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
     vkCmdDispatch(*cmd, m_bodies.size(), m_bodies.size(), 1);
 
     transitionBuffer(*cmd,
-                     m_dataBuffer.buffer,
-                     VK_ACCESS_2_SHADER_WRITE_BIT,
+                     m_dataBuffer[imgIndex].buffer,
+                     VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
                      VK_ACCESS_2_TRANSFER_READ_BIT,
                      VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT,
                      VK_PIPELINE_STAGE_2_COPY_BIT);
@@ -54,14 +55,17 @@ void GravityComputePass::render(VkCommandBuffer *cmd)
     VkBufferCopy copyRegion{};
     copyRegion.size = m_bodies.size() * sizeof(glm::vec4);
 
-    vkCmdCopyBuffer(*cmd, m_dataBuffer.buffer, m_readBuffer.buffer, 1, &copyRegion);
+    vkCmdCopyBuffer(*cmd,
+                    m_dataBuffer[imgIndex].buffer,
+                    m_readBuffer[imgIndex].buffer,
+                    1,
+                    &copyRegion);
+}
 
-    transitionBuffer(*cmd,
-                     m_dataBuffer.buffer,
-                     VK_ACCESS_2_SHADER_WRITE_BIT,
-                     VK_ACCESS_2_TRANSFER_READ_BIT,
-                     VK_PIPELINE_STAGE_2_COPY_BIT,
-                     VK_PIPELINE_STAGE_2_HOST_BIT);
+void GravityComputePass::read(uint32_t imgIndex)
+{
+    auto data = (glm::vec4 *) m_readBuffer[imgIndex].mappedData;
+    std::cout << "First element: " << data[0].x << std::endl;
 }
 
 void GravityComputePass::createPipeline()
@@ -97,13 +101,13 @@ void GravityComputePass::createPipeline()
 
 void GravityComputePass::createDescriptor()
 {
-    VkDescriptorSetLayoutBinding binding1;
+    VkDescriptorSetLayoutBinding binding1{};
     binding1.binding = 0;
     binding1.descriptorCount = 1;
     binding1.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     binding1.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding binding2;
+    VkDescriptorSetLayoutBinding binding2{};
     binding2.binding = 1;
     binding2.descriptorCount = 1;
     binding2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -135,12 +139,17 @@ void GravityComputePass::generateData()
         glm::vec4(4.503e12f, 0.0f, 0.0f, 1.024e26f)  // Neptune
     };
 
-    m_dataBuffer = makeBuffer({m_bodies.size() * sizeof(glm::vec4),
-                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-                              m_bodies.data());
+    for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
+        m_dataBuffer[i] = makeBuffer({m_bodies.size() * sizeof(glm::vec4),
+                                      VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+                                          | VK_BUFFER_USAGE_TRANSFER_DST_BIT
+                                          | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                                     m_bodies.data());
 
-    m_readBuffer = makeBuffer({m_bodies.size() * sizeof(glm::vec4),
-                               VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT});
+        m_readBuffer[i] = makeBuffer(
+            {m_bodies.size() * sizeof(glm::vec4),
+             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT});
+    }
 }

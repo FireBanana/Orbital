@@ -8,7 +8,7 @@ class ForwardPass : public Pass
 public:
     ForwardPass();
 
-    void render(VkCommandBuffer *cmd) override;
+    void render(VkCommandBuffer *cmd, uint32_t imgIndex) override;
 
 private:
     void createPipeline() override;

@@ -22,29 +22,10 @@ float3 bodybodyInteraction(float4 bi, float4 bj)
 [[numthreads(9, 9, 1)]]
 void main(uint3 GlobalInvocationID : SV_DispatchThreadID)
 {
-    //int2 pos = int2(GlobalInvocationID.xy);
-    //float4 colorSum = float4(0.0, 0.0, 0.0, 0.0);
-
     var planet1 = data[GlobalInvocationID.x];
     var planet2 = data[GlobalInvocationID.y];
 
     var effect = bodybodyInteraction(planet1, planet2);
 
-    // Change this radius to control blur strength:
-    //int RADIUS = val;
-    //const float SAMPLE_COUNT = float((RADIUS * 2 + 1) * (RADIUS * 2 + 1));
-
-    // Accumulate the massive neighborhood
-    //for (int x = -RADIUS; x <= RADIUS; ++x)
-    //{
-    //    for (int y = -RADIUS; y <= RADIUS; ++y)
-    //    {
-    //        colorSum += renderTarget[pos + int2(x, y)];
-    //    }
-    //}
-
-    // Average the accumulated colors
-    //renderTarget[pos] = colorSum / SAMPLE_COUNT;
-
-    //renderTarget[pos] = planet1;
+    data[GlobalInvocationID.x] = planet1;
 }

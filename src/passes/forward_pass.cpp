@@ -9,7 +9,7 @@ ForwardPass::ForwardPass()
     createPipeline();
 }
 
-void ForwardPass::render(VkCommandBuffer *cmd)
+void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
@@ -218,7 +218,7 @@ void ForwardPass::createSampler()
 
 void ForwardPass::createDescriptor()
 {
-    VkDescriptorSetLayoutBinding binding;
+    VkDescriptorSetLayoutBinding binding{};
     binding.binding = 0;
     binding.descriptorCount = 1;
     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

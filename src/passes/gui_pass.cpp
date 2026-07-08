@@ -7,7 +7,7 @@ GuiPass::GuiPass()
     createPipeline();
 }
 
-void GuiPass::render(VkCommandBuffer *cmd)
+void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     vkCmdDraw(*cmd, 5, 1, 0, 0);

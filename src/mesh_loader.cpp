@@ -92,7 +92,7 @@ std::vector<Image> MeshLoader::loadImage(fastgltf::Expected<fastgltf::Asset> &as
                            auto *data = stbi_load(path.c_str(), &width, &height, &channels, 4);
                            result.push_back({static_cast<uint32_t>(width),
                                              static_cast<uint32_t>(height),
-                                             static_cast<uint32_t>(channels),
+                                             static_cast<uint32_t>(4),
                                              data});
                        },
                        [&](fastgltf::sources::Array &vec) {
@@ -107,7 +107,7 @@ std::vector<Image> MeshLoader::loadImage(fastgltf::Expected<fastgltf::Asset> &as
 
                            result.push_back({static_cast<uint32_t>(width),
                                              static_cast<uint32_t>(height),
-                                             static_cast<uint32_t>(channels),
+                                             static_cast<uint32_t>(4),
                                              data});
                        },
                        [&](fastgltf::sources::BufferView &view) {
