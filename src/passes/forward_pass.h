@@ -6,7 +6,7 @@
 class ForwardPass : public Pass
 {
 public:
-    ForwardPass();
+    explicit ForwardPass(Graphics *graphics);
 
     void render(VkCommandBuffer *cmd, uint32_t imgIndex) override;
 

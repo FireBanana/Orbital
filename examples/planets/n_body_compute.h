@@ -1,13 +1,13 @@
 #ifndef N_BODY_COMPUTE_H
 #define N_BODY_COMPUTE_H
 
-#include "../global.h"
-#include "../passes/pass.h"
+#include "global.h"
+#include "passes/pass.h"
 
 class GravityComputePass : public Pass
 {
 public:
-    GravityComputePass();
+    explicit GravityComputePass(Graphics *graphics);
 
     void render(VkCommandBuffer *cmd, uint32_t imgIndex) override;
     void read(uint32_t imgIndex) override;

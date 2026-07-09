@@ -2,7 +2,8 @@
 #include "../global.h"
 #include "../graphics.h"
 
-GuiPass::GuiPass()
+GuiPass::GuiPass(Graphics *graphics)
+    : Pass(graphics)
 {
     createPipeline();
 }
@@ -89,11 +90,13 @@ void GuiPass::createPipeline()
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
         {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = getShaderModule(ROOT "shaders/line.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+          .module = m_graphics->getShaderModule(ROOT "shaders/line.vert.spv",
+                                                VK_SHADER_STAGE_VERTEX_BIT),
           .pName = "main"},
          {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = getShaderModule(ROOT "shaders/line.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
+          .module = m_graphics->getShaderModule(ROOT "shaders/line.frag.spv",
+                                                VK_SHADER_STAGE_FRAGMENT_BIT),
           .pName = "main"}}};
 
     VkPipelineRenderingCreateInfo renderingInfo{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};

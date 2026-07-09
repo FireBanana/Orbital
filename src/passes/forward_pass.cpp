@@ -2,7 +2,8 @@
 #include "../global.h"
 #include "../graphics.h"
 
-ForwardPass::ForwardPass()
+ForwardPass::ForwardPass(Graphics *graphics)
+    : Pass(graphics)
 {
     createSampler();
     createDescriptor();
@@ -177,12 +178,13 @@ void ForwardPass::createPipeline()
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
         {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = getShaderModule(ROOT "shaders/triangle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
+          .module = m_graphics->getShaderModule(ROOT "shaders/triangle.vert.spv",
+                                                VK_SHADER_STAGE_VERTEX_BIT),
           .pName = "main"},
          {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = getShaderModule(ROOT "shaders/triangle.frag.spv",
-                                    VK_SHADER_STAGE_FRAGMENT_BIT),
+          .module = m_graphics->getShaderModule(ROOT "shaders/triangle.frag.spv",
+                                                VK_SHADER_STAGE_FRAGMENT_BIT),
           .pName = "main"}}};
 
     VkPipelineRenderingCreateInfo renderingInfo{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};

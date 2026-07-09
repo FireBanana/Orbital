@@ -13,6 +13,7 @@
 #include <vulkan/vulkan_core.h>
 
 class Pass;
+class Window;
 
 struct Frame
 {
@@ -80,51 +81,62 @@ struct NativeModel
     vec3 position = {0, 0, 0};
 };
 
-uint32_t findMemoryType(VkPhysicalDevice phyDevice,
-                        uint32_t filterType,
-                        VkMemoryPropertyFlags props);
+class Graphics
+{
+public:
+    Graphics(Window *window);
 
-VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bits);
+    Buffer makeBuffer(BufferDescription desc, void *data = nullptr);
 
-void makeInstance();
+    Texture makeImage(TextureDescription desc, Image *image = nullptr);
 
-void makeDevice();
+    NativeModel makeNativeModel(Model &model);
 
-Buffer makeBuffer(BufferDescription desc, void *data = nullptr);
+    VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bits);
 
-void initPerFrame(int index);
+    void transitionImageLayout(VkCommandBuffer cmd,
+                               VkImage img,
+                               VkImageLayout oldLayout,
+                               VkImageLayout newLayout,
+                               VkImageAspectFlags flags,
+                               VkAccessFlags2 srcAccessMask,
+                               VkAccessFlags2 dstAccessMask,
+                               VkPipelineStageFlags2 srcStage,
+                               VkPipelineStageFlags2 dstStage);
 
-Texture makeImage(TextureDescription desc, Image *image = nullptr);
+    void transitionBuffer(VkCommandBuffer cmd,
+                          VkBuffer buffer,
+                          VkAccessFlags2 srcAccess,
+                          VkAccessFlags2 dstAccess,
+                          VkPipelineStageFlags2 srcStage,
+                          VkPipelineStageFlags2 dstStage);
 
-void makeSwapchain();
+    void beginRenderLoop(std::vector<Pass *> &graphicsPasses,
+                         std::vector<Pass *> &computePasses,
+                         std::function<void(double)> updateFn);
 
-void makeRenderTarget();
+private:
+    uint32_t findMemoryType(VkPhysicalDevice phyDevice,
+                            uint32_t filterType,
+                            VkMemoryPropertyFlags props);
 
-void transitionImageLayout(VkCommandBuffer cmd,
-                           VkImage img,
-                           VkImageLayout oldLayout,
-                           VkImageLayout newLayout,
-                           VkImageAspectFlags flags,
-                           VkAccessFlags2 srcAccessMask,
-                           VkAccessFlags2 dstAccessMask,
-                           VkPipelineStageFlags2 srcStage,
-                           VkPipelineStageFlags2 dstStage);
+    void makeInstance();
 
-void transitionBuffer(VkCommandBuffer cmd,
-                      VkBuffer buffer,
-                      VkAccessFlags2 srcAccess,
-                      VkAccessFlags2 dstAccess,
-                      VkPipelineStageFlags2 srcStage,
-                      VkPipelineStageFlags2 dstStage);
+    void makeDevice();
 
-void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *> computePasses);
+    void makeSwapchain();
 
-VkResult presentImage(uint32_t index);
+    void makeRenderTarget();
 
-VkResult acquireSwapchainImage(uint32_t *img);
+    void initPerFrame(int index);
 
-NativeModel makeNativeModel(Model &model);
+    void render(uint32_t img,
+                std::vector<Pass *> graphicsPasses,
+                std::vector<Pass *> computePasses);
 
-void beginRenderLoop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses);
+    VkResult presentImage(uint32_t index);
+
+    VkResult acquireSwapchainImage(uint32_t *img);
+};
 
 #endif // GRAPHICS_H

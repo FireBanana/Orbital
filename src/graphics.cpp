@@ -1,6 +1,7 @@
 #include "graphics.h"
 #include "global.h"
 #include "passes/pass.h"
+#include "window.h"
 #include <array>
 #include <cstring>
 #include <fstream>
@@ -9,9 +10,9 @@
 
 // TODO: Move compute stuff to a compute queue https://github.com/KhronosGroup/Vulkan-Samples/blob/main/samples/performance/async_compute/README.adoc
 
-uint32_t findMemoryType(VkPhysicalDevice phyDevice,
-                          uint32_t filterType,
-                          VkMemoryPropertyFlags props)
+uint32_t Graphics::findMemoryType(VkPhysicalDevice phyDevice,
+                                  uint32_t filterType,
+                                  VkMemoryPropertyFlags props)
 {
     VkPhysicalDeviceMemoryProperties memProperties;
     vkGetPhysicalDeviceMemoryProperties(phyDevice, &memProperties);
@@ -26,7 +27,7 @@ uint32_t findMemoryType(VkPhysicalDevice phyDevice,
     throw;
 }
 
-VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bits)
+VkShaderModule Graphics::getShaderModule(const std::string path, VkShaderStageFlagBits bits)
 {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) {
@@ -56,7 +57,7 @@ VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bit
     return module;
 }
 
-void makeInstance()
+void Graphics::makeInstance()
 {
     uint32_t instExtensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &instExtensionCount, nullptr);
@@ -85,7 +86,7 @@ void makeInstance()
         std::cout << "Creation instance failed" << std::endl;
 }
 
-void makeDevice()
+void Graphics::makeDevice()
 {
     uint32_t gpuCount = 0;
     vkEnumeratePhysicalDevices(Global::g_instance, &gpuCount, nullptr);
@@ -144,7 +145,16 @@ void makeDevice()
     vkGetDeviceQueue(Global::g_device, Global::QUEUE_INDEX, 0, &Global::g_queue);
 }
 
-Buffer makeBuffer(BufferDescription desc, void *data)
+Graphics::Graphics(Window *window)
+{
+    makeInstance();
+    makeDevice();
+    window->makeSurface();
+    makeSwapchain();
+    makeRenderTarget();
+}
+
+Buffer Graphics::makeBuffer(BufferDescription desc, void *data)
 {
     Buffer result{};
 
@@ -249,7 +259,7 @@ Buffer makeBuffer(BufferDescription desc, void *data)
     return result;
 }
 
-void initPerFrame(int index)
+void Graphics::initPerFrame(int index)
 {
     VkFenceCreateInfo info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -282,7 +292,7 @@ void initPerFrame(int index)
         std::cout << "buffer failed" << std::endl;
 }
 
-Texture makeImage(TextureDescription desc, Image *image)
+Texture Graphics::makeImage(TextureDescription desc, Image *image)
 {
     Texture result{};
 
@@ -429,7 +439,7 @@ Texture makeImage(TextureDescription desc, Image *image)
     return result;
 }
 
-void makeRenderTarget()
+void Graphics::makeRenderTarget()
 {
     for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
         auto target = makeImage({Global::WIDTH,
@@ -443,7 +453,7 @@ void makeRenderTarget()
     }
 }
 
-void makeSwapchain()
+void Graphics::makeSwapchain()
 {
     VkSurfaceCapabilitiesKHR surfaceProperties;
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Global::g_physical_device,
@@ -510,7 +520,7 @@ void makeSwapchain()
     }
 }
 
-void transitionImageLayout(VkCommandBuffer cmd,
+void Graphics::transitionImageLayout(VkCommandBuffer cmd,
                            VkImage img,
                              VkImageLayout oldLayout,
                              VkImageLayout newLayout,
@@ -544,7 +554,7 @@ void transitionImageLayout(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-void transitionBuffer(VkCommandBuffer cmd,
+void Graphics::transitionBuffer(VkCommandBuffer cmd,
                       VkBuffer buffer,
                       VkAccessFlags2 srcAccess,
                       VkAccessFlags2 dstAccess,
@@ -569,7 +579,9 @@ void transitionBuffer(VkCommandBuffer cmd,
     vkCmdPipelineBarrier2(cmd, &depInfo);
 }
 
-void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *> computePasses)
+void Graphics::render(uint32_t img,
+                      std::vector<Pass *> graphicsPasses,
+                      std::vector<Pass *> computePasses)
 {
     auto cmd = Global::g_frame_data[img].buffer;
 
@@ -744,7 +756,7 @@ void render(uint32_t img, std::vector<Pass *> graphicsPasses, std::vector<Pass *
     }
 }
 
-VkResult presentImage(uint32_t index)
+VkResult Graphics::presentImage(uint32_t index)
 {
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present.waitSemaphoreCount = 1;
@@ -756,7 +768,7 @@ VkResult presentImage(uint32_t index)
     return vkQueuePresentKHR(Global::g_queue, &present);
 }
 
-VkResult acquireSwapchainImage(uint32_t *img)
+VkResult Graphics::acquireSwapchainImage(uint32_t *img)
 {
     VkSemaphore semaphore;
 
@@ -797,7 +809,7 @@ VkResult acquireSwapchainImage(uint32_t *img)
     return res;
 }
 
-NativeModel makeNativeModel(Model &model)
+NativeModel Graphics::makeNativeModel(Model &model)
 {
     auto vbuffer = makeBuffer({sizeof(vertex) * model.mesh.vertices.size(),
                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -818,7 +830,9 @@ NativeModel makeNativeModel(Model &model)
     return {vbuffer, ibuffer, modelTex, static_cast<uint32_t>(model.mesh.indices.size())};
 }
 
-void beginRenderLoop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &computePasses)
+void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
+                               std::vector<Pass *> &computePasses,
+                               std::function<void(double)> updateFn)
 {
     Global::g_gui_thread = std::thread([&]() {
         while (!glfwWindowShouldClose(Global::g_window)) {
@@ -833,10 +847,40 @@ void beginRenderLoop(std::vector<Pass *> &graphicsPasses, std::vector<Pass *> &c
             render(frame, graphicsPasses, computePasses);
             presentImage(frame);
 
-            //glfwSwapBuffers(Global::g_window);
             glfwPollEvents();
         }
 
         Global::g_window_running = false;
     });
+
+    uint64_t frame = 0;
+
+    double t = 0.0;
+    double dt = 1000 / 60.0;
+    auto currTime = std::chrono::high_resolution_clock::now();
+
+    // Main loop
+    while (1) {
+        if (!Global::g_window_running)
+            break;
+
+        auto newTime = std::chrono::high_resolution_clock::now();
+        auto frameTime = std::chrono::duration<double, std::milli>(newTime - currTime).count();
+        currTime = newTime;
+
+        while (frameTime > 0.0) {
+            float delta = std::min(frameTime, dt);
+
+            //processing
+            updateFn(t);
+
+            frameTime -= delta;
+            t += delta;
+        }
+
+        frame++;
+        std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(dt));
+    }
+
+    Global::g_gui_thread.join();
 }

@@ -1,0 +1,90 @@
+#include "window.h"
+#include "global.h"
+#include <iostream>
+
+Window::Window()
+{
+    if (!glfwInit())
+        std::cout << "Issues!";
+
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_DECORATED, GL_TRUE);
+
+    Global::g_window = glfwCreateWindow(Global::WIDTH, Global::HEIGHT, "Orbital", NULL, NULL);
+
+    if (!Global::g_window)
+        throw;
+
+    glfwShowWindow(Global::g_window);
+
+    glfwSetWindowUserPointer(Global::g_window, &m_state);
+
+    glfwSetMouseButtonCallback(Global::g_window,
+                               [](GLFWwindow *window, int button, int action, int mods) {
+                                   auto *state = static_cast<WindowState *>(
+                                       glfwGetWindowUserPointer(window));
+
+                                   if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                                       if (action == GLFW_PRESS) {
+                                           state->isPressed = true;
+                                           state->newClick = true;
+                                       } else if (action == GLFW_RELEASE) {
+                                           state->isPressed = false;
+                                       }
+                                   }
+                               });
+
+    glfwSetCursorPosCallback(Global::g_window, [](GLFWwindow *window, double xpos, double ypos) {
+        static double lastXPosition = xpos, lastYPosition = ypos;
+
+        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
+
+        if (!state->isPressed)
+            return;
+
+        if (state->newClick) {
+            lastXPosition = xpos;
+            lastYPosition = ypos;
+            state->newClick = false;
+        }
+
+        state->xDelta -= xpos - lastXPosition;
+        state->yDelta += ypos - lastYPosition;
+        state->yDelta = glm::clamp(state->yDelta, -130.0 + 0.01, 130.0 - 0.01);
+
+        Global::g_camera_position
+            = glm::vec3(state->cameraDistance
+                            * (glm::sin(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)),
+                        state->cameraDistance * (glm::sin(state->yDelta * 0.01)),
+                        state->cameraDistance
+                            * (glm::cos(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)));
+
+        lastXPosition = xpos;
+        lastYPosition = ypos;
+    });
+
+    glfwSetScrollCallback(Global::g_window, [](GLFWwindow *window, double xoffset, double yoffset) {
+        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
+
+        state->cameraDistance -= yoffset * 0.2;
+
+        Global::g_camera_position
+            = glm::vec3(state->cameraDistance
+                            * (glm::sin(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)),
+                        state->cameraDistance * (glm::sin(state->yDelta * 0.01)),
+                        state->cameraDistance
+                            * (glm::cos(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)));
+    });
+}
+
+void Window::makeSurface()
+{
+    if (auto res = glfwCreateWindowSurface(Global::g_instance,
+                                           Global::g_window,
+                                           nullptr,
+                                           &Global::g_surface);
+        res == VK_SUCCESS)
+        std::cout << "Surface creation good" << std::endl;
+    else
+        std::cout << "Surface creation failed " << res << std::endl;
+}

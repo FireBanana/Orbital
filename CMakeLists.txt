@@ -32,37 +32,23 @@ set(SOURCES
         src/graphics.h src/graphics.cpp external/stb_image.h
         src/types.h
         src/global.h
+        src/window.h src/window.cpp
         src/passes/pass.h
         src/passes/forward_pass.h src/passes/forward_pass.cpp
-        src/passes/gui_pass.h src/passes/gui_pass.cpp
-        #src/cuda.h
-        src/passes/n_body_compute.h src/passes/n_body_compute.cpp)
+        src/passes/gui_pass.h src/passes/gui_pass.cpp)
 
-add_executable(Orbital ${SOURCES})
-
-# if(NVIDIA_GPU)
-#     list(APPEND SOURCES src/cuda.cu)
-# else()
-#     list(APPEND SOURCES src/cuda.hip)
-# endif()
-
-# set_target_properties( Orbital
-#                        PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-
-# if(NVIDIA_GPU)
-#     set_source_files_properties(src/cuda.cu PROPERTIES LANGUAGE CUDA)
-# else()
-#     set_source_files_properties(src/cuda.hip PROPERTIES LANGUAGE HIP)
-# endif()
+add_library(Orbital ${SOURCES})
 
 include(GNUInstallDirs)
 
-target_compile_definitions(Orbital PRIVATE ROOT="${CMAKE_SOURCE_DIR}/")
+target_compile_definitions(Orbital PUBLIC ROOT="${CMAKE_SOURCE_DIR}/")
 
 #target_include_directories(Orbital PRIVATE ${fastgltf_SOURCE_DIR})
-target_include_directories(Orbital PRIVATE "external/")
+target_include_directories(Orbital PUBLIC "src/" "external/")
 
-target_link_libraries(Orbital PRIVATE Vulkan::Vulkan glfw fastgltf::fastgltf)
+target_link_libraries(Orbital PUBLIC Vulkan::Vulkan glfw fastgltf::fastgltf)
+
+add_subdirectory(examples)
 
 install(TARGETS Orbital
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

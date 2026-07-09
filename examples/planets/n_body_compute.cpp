@@ -1,8 +1,9 @@
 #include "n_body_compute.h"
-#include "../global.h"
+#include "global.h"
 #include <iostream>
 
-GravityComputePass::GravityComputePass()
+GravityComputePass::GravityComputePass(Graphics *graphics)
+    : Pass(graphics)
 {
     createDescriptor();
     createPipeline();
@@ -45,7 +46,7 @@ void GravityComputePass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     vkCmdDispatch(*cmd, m_bodies.size(), m_bodies.size(), 1);
 
-    transitionBuffer(*cmd,
+    m_graphics->transitionBuffer(*cmd,
                      m_dataBuffer[imgIndex].buffer,
                      VK_ACCESS_2_SHADER_STORAGE_WRITE_BIT,
                      VK_ACCESS_2_TRANSFER_READ_BIT,
@@ -65,7 +66,7 @@ void GravityComputePass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 void GravityComputePass::read(uint32_t imgIndex)
 {
     auto data = (glm::vec4 *) m_readBuffer[imgIndex].mappedData;
-    std::cout << "First element: " << data[0].x << std::endl;
+    std::cout << data->x << std::endl;
 }
 
 void GravityComputePass::createPipeline()
@@ -86,8 +87,8 @@ void GravityComputePass::createPipeline()
 
     VkPipelineShaderStageCreateInfo shaderStage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     shaderStage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    shaderStage.module = getShaderModule(ROOT "shaders/gravity.comp.spv",
-                                         VK_SHADER_STAGE_COMPUTE_BIT);
+    shaderStage.module = m_graphics->getShaderModule(ROOT "shaders/gravity.comp.spv",
+                                                     VK_SHADER_STAGE_COMPUTE_BIT);
     shaderStage.pName = "main";
 
     VkComputePipelineCreateInfo computeInfo{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
@@ -140,14 +141,14 @@ void GravityComputePass::generateData()
     };
 
     for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
-        m_dataBuffer[i] = makeBuffer({m_bodies.size() * sizeof(glm::vec4),
+        m_dataBuffer[i] = m_graphics->makeBuffer({m_bodies.size() * sizeof(glm::vec4),
                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
                                           | VK_BUFFER_USAGE_TRANSFER_DST_BIT
                                           | VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
                                       VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                                      m_bodies.data());
 
-        m_readBuffer[i] = makeBuffer(
+        m_readBuffer[i] = m_graphics->makeBuffer(
             {m_bodies.size() * sizeof(glm::vec4),
              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT});
