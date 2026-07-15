@@ -66,7 +66,7 @@ void GravityComputePass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 void GravityComputePass::read(uint32_t imgIndex)
 {
     auto data = (glm::vec4 *) m_readBuffer[imgIndex].mappedData;
-    std::cout << data->x << std::endl;
+    //std::cout << data->x << std::endl;
 }
 
 void GravityComputePass::createPipeline()

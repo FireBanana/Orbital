@@ -7,7 +7,6 @@ class GuiPass : public Pass
 {
 public:
     explicit GuiPass(Graphics *graphics);
-
     void render(VkCommandBuffer *cmd, uint32_t imgIndex) override;
 
 private:

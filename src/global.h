@@ -39,7 +39,6 @@ inline UniformConstants g_constants = {g_model, g_view, g_projection, glm::vec4(
 
 inline std::vector<VkImage> g_swapchain_images;
 inline std::vector<VkImageView> g_swapchain_views;
-inline Texture g_depth;
 
 // Per frame data
 inline std::vector<VkSemaphore> g_semaphores;

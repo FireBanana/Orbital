@@ -64,6 +64,7 @@ struct Buffer
 
 struct Texture
 {
+    bool isValid;
     VkDeviceMemory memory;
     VkImage image;
     VkImageView view;

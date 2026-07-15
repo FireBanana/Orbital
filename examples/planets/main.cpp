@@ -11,12 +11,6 @@ int main()
     Window w{};
     Graphics graphics{&w};
 
-    Global::g_depth = graphics.makeImage({Global::WIDTH,
-                                 Global::HEIGHT,
-                                 Global::DEPTH_FORMAT,
-                                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                 VK_IMAGE_ASPECT_DEPTH_BIT});
-
     ForwardPass fPass{&graphics};
     GuiPass gPass{&graphics};
     GravityComputePass gcPass{&graphics};

@@ -5,13 +5,35 @@
 GuiPass::GuiPass(Graphics *graphics)
     : Pass(graphics)
 {
+    addAttachments(&Global::g_render_targets);
     createPipeline();
 }
 
 void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
+    VkClearValue clearColorValue{};
+    clearColorValue.color = {{0, 0, 0}};
+
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+    VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    colorAttachment.imageView = m_attachments->at(imgIndex).view;
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue = clearColorValue;
+
+    VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    renderingInfo.renderArea.offset = {0, 0};
+    renderingInfo.renderArea.extent.width = Global::WIDTH;
+    renderingInfo.renderArea.extent.height = Global::HEIGHT;
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachment;
+
+    vkCmdBeginRendering(*cmd, &renderingInfo);
     vkCmdDraw(*cmd, 5, 1, 0, 0);
+    vkCmdEndRendering(*cmd);
 }
 
 void GuiPass::createPipeline()

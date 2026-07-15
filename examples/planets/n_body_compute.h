@@ -8,7 +8,6 @@ class GravityComputePass : public Pass
 {
 public:
     explicit GravityComputePass(Graphics *graphics);
-
     void render(VkCommandBuffer *cmd, uint32_t imgIndex) override;
     void read(uint32_t imgIndex) override;
 

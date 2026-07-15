@@ -1,10 +1,20 @@
 #include "forward_pass.h"
 #include "../global.h"
 #include "../graphics.h"
+#include <iostream>
 
 ForwardPass::ForwardPass(Graphics *graphics)
     : Pass(graphics)
 {
+    m_forwardDepth = graphics->makeImage({Global::WIDTH,
+                                          Global::HEIGHT,
+                                          Global::DEPTH_FORMAT,
+                                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                          VK_IMAGE_ASPECT_DEPTH_BIT});
+
+    addAttachments(&Global::g_render_targets);
+    addDepth(&m_forwardDepth);
+
     createSampler();
     createDescriptor();
     createPipeline();
@@ -12,6 +22,69 @@ ForwardPass::ForwardPass(Graphics *graphics)
 
 void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
+    //------------------------------
+
+    VkClearValue clearColorValue{}, depthClearValue{};
+    clearColorValue.color = {{0, 0, 0}};
+    depthClearValue.depthStencil = {1, 0};
+
+    VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    colorAttachment.imageView = m_attachments->at(imgIndex).view;
+    colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachment.clearValue = clearColorValue;
+
+    VkRenderingAttachmentInfo depthAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    depthAttachment.imageView = m_depth->view;
+    depthAttachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.clearValue = depthClearValue;
+
+    // VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    // colorAttachment.imageView = Global::g_render_targets[imgIndex].view;
+    // colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    // colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    // colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    // colorAttachment.clearValue = clearColorValue;
+
+    VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    renderingInfo.renderArea.offset = {0, 0};
+    renderingInfo.renderArea.extent.width = Global::WIDTH;
+    renderingInfo.renderArea.extent.height = Global::HEIGHT;
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachment;
+    renderingInfo.pDepthAttachment = &depthAttachment;
+
+    m_graphics->transitionImageLayout(*cmd,
+                                      m_depth->image,
+                                      VK_IMAGE_LAYOUT_UNDEFINED,
+                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                                      VK_IMAGE_ASPECT_DEPTH_BIT,
+                                      VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
+                                      VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+                                          | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+                                      VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
+                                      VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
+                                          | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
+
+    // Transition targets to color attachment
+    m_graphics->transitionImageLayout(*cmd,
+                                      Global::g_render_targets[imgIndex].image,
+                                      VK_IMAGE_LAYOUT_UNDEFINED,
+                                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                                      VK_IMAGE_ASPECT_COLOR_BIT,
+                                      0,
+                                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                                          | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+                                      VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+    vkCmdBeginRendering(*cmd, &renderingInfo);
+
+    //------------------------------
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
     VkViewport vp{};
@@ -84,6 +157,8 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
             vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
         }
     }
+
+    vkCmdEndRendering(*cmd);
 }
 
 void ForwardPass::createPipeline()
