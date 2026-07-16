@@ -42,13 +42,6 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.clearValue = depthClearValue;
 
-    // VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    // colorAttachment.imageView = Global::g_render_targets[imgIndex].view;
-    // colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    // colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    // colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    // colorAttachment.clearValue = clearColorValue;
-
     VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
     renderingInfo.renderArea.offset = {0, 0};
     renderingInfo.renderArea.extent.width = Global::WIDTH;
@@ -69,18 +62,6 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                                       VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
                                       VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
                                           | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
-
-    // Transition targets to color attachment
-    m_graphics->transitionImageLayout(*cmd,
-                                      Global::g_render_targets[imgIndex].image,
-                                      VK_IMAGE_LAYOUT_UNDEFINED,
-                                      VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                                      VK_IMAGE_ASPECT_COLOR_BIT,
-                                      0,
-                                      VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
-                                          | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
-                                      VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
-                                      VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
     vkCmdBeginRendering(*cmd, &renderingInfo);
 

@@ -1,20 +1,82 @@
 #include "gui_pass.h"
 #include "../global.h"
 #include "../graphics.h"
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_vulkan.h>
 
 GuiPass::GuiPass(Graphics *graphics)
     : Pass(graphics)
 {
     addAttachments(&Global::g_render_targets);
-    createPipeline();
+    // createPipeline();
+
+    ImGui::CreateContext();
+    ImGui_ImplGlfw_InitForVulkan(Global::g_window, true);
+    ImGui_ImplVulkan_InitInfo init_info{};
+    init_info.Instance = Global::g_instance;
+    init_info.PhysicalDevice = Global::g_physical_device;
+    init_info.Device = Global::g_device;
+    init_info.QueueFamily = Global::QUEUE_INDEX;
+    init_info.Queue = Global::g_queue;
+    init_info.DescriptorPoolSize = 8;
+    init_info.MinImageCount = 2;
+    init_info.ImageCount = Global::SWAPCHAIN_SIZE;
+    init_info.UseDynamicRendering = true;
+    init_info.ApiVersion = VK_API_VERSION_1_4;
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &Global::RENDER_TARGET_FORMAT,
+    };
+
+    ImGui_ImplVulkan_Init(&init_info);
 }
 
 void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
+    // VkClearValue clearColorValue{};
+    // clearColorValue.color = {{0, 0, 0}};
+
+    // vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+
+    // VkViewport vp{};
+    // vp.x = 0;
+    // vp.y = static_cast<float>(Global::HEIGHT);
+    // vp.width = static_cast<float>(Global::WIDTH);
+    // vp.height = -static_cast<float>(Global::HEIGHT); // Flip viewport for Y up
+    // vp.minDepth = 0.0f;
+    // vp.maxDepth = 1.0f;
+
+    // vkCmdSetViewport(*cmd, 0, 1, &vp);
+
+    // VkRect2D scissor{};
+    // scissor.extent.width = Global::WIDTH;
+    // scissor.extent.height = Global::HEIGHT;
+
+    // vkCmdSetScissor(*cmd, 0, 1, &scissor);
+    // vkCmdSetCullMode(*cmd, VK_CULL_MODE_BACK_BIT);
+
+    // VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    // colorAttachment.imageView = m_attachments->at(imgIndex).view;
+    // colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    // colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    // colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    // colorAttachment.clearValue = clearColorValue;
+
+    // VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    // renderingInfo.renderArea.offset = {0, 0};
+    // renderingInfo.renderArea.extent.width = Global::WIDTH;
+    // renderingInfo.renderArea.extent.height = Global::HEIGHT;
+    // renderingInfo.layerCount = 1;
+    // renderingInfo.colorAttachmentCount = 1;
+    // renderingInfo.pColorAttachments = &colorAttachment;
+
+    // vkCmdBeginRendering(*cmd, &renderingInfo);
+    // vkCmdDraw(*cmd, 5, 1, 0, 0);
+    // vkCmdEndRendering(*cmd);
+
     VkClearValue clearColorValue{};
     clearColorValue.color = {{0, 0, 0}};
-
-    vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
 
     VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     colorAttachment.imageView = m_attachments->at(imgIndex).view;
@@ -31,118 +93,20 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachment;
 
+    ImGui_ImplVulkan_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    // your UI
+    ImGui::ShowDemoWindow(); // or your own windows
+    ImGui::Render();         // finalizes draw data, does NOT touch Vulkan
+
     vkCmdBeginRendering(*cmd, &renderingInfo);
-    vkCmdDraw(*cmd, 5, 1, 0, 0);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *cmd);
     vkCmdEndRendering(*cmd);
 }
 
 void GuiPass::createPipeline()
 {
-    VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    vkCreatePipelineLayout(Global::g_device, &layoutInfo, nullptr, &m_pipelineLayout);
-
-    VkVertexInputBindingDescription bindingDesc{};
-    bindingDesc.binding = 0;
-    bindingDesc.stride = sizeof(vertex);
-    bindingDesc.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-    // struct line_vertex
-    // {
-    //     vec3 position;
-    // };
-
-    // std::array<VkVertexInputAttributeDescription, 1> attrDescription = {
-    //     {{.location = 0,
-    //       .binding = 0,
-    //       .format = VK_FORMAT_R32G32B32_SFLOAT,
-    //       .offset = offsetof(line_vertex, position)}}};
-
-    VkPipelineVertexInputStateCreateInfo vertexStateInfo{
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
-    vertexStateInfo.vertexBindingDescriptionCount = 0;
-    // vertexStateInfo.vertexAttributeDescriptionCount = (uint32_t) attrDescription.size();
-    // vertexStateInfo.pVertexBindingDescriptions = &bindingDesc;
-    // vertexStateInfo.pVertexAttributeDescriptions = attrDescription.data();
-
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{
-        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
-    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
-    inputAssembly.primitiveRestartEnable = false;
-
-    VkPipelineRasterizationStateCreateInfo rasterInfo{
-        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO};
-    rasterInfo.depthClampEnable = false;
-    rasterInfo.rasterizerDiscardEnable = false;
-    rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterInfo.depthBiasEnable = false;
-    rasterInfo.lineWidth = 1.0;
-
-    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
-                                                  VK_DYNAMIC_STATE_SCISSOR,
-                                                  VK_DYNAMIC_STATE_CULL_MODE};
-
-    VkPipelineColorBlendAttachmentState blendAttachment{};
-    blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-                                      | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-    VkPipelineColorBlendStateCreateInfo blendStateInfo{
-        VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-    blendStateInfo.attachmentCount = 1;
-    blendStateInfo.pAttachments = &blendAttachment;
-
-    VkPipelineViewportStateCreateInfo viewportState{
-        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
-    viewportState.viewportCount = 1;
-    viewportState.scissorCount = 1;
-
-    VkPipelineDepthStencilStateCreateInfo depthStencilState{
-        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
-    depthStencilState.depthTestEnable = VK_FALSE;
-    depthStencilState.depthWriteEnable = VK_FALSE;
-
-    VkPipelineMultisampleStateCreateInfo multisampleState{
-        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
-    multisampleState.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    VkPipelineDynamicStateCreateInfo dynamicStateInfo{
-        VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO};
-    dynamicStateInfo.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size()),
-    dynamicStateInfo.pDynamicStates = dynamicStates.data();
-
-    std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
-        {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-          .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = m_graphics->getShaderModule(ROOT "shaders/line.vert.spv",
-                                                VK_SHADER_STAGE_VERTEX_BIT),
-          .pName = "main"},
-         {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-          .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = m_graphics->getShaderModule(ROOT "shaders/line.frag.spv",
-                                                VK_SHADER_STAGE_FRAGMENT_BIT),
-          .pName = "main"}}};
-
-    VkPipelineRenderingCreateInfo renderingInfo{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachmentFormats = &Global::RENDER_TARGET_FORMAT;
-    renderingInfo.depthAttachmentFormat = Global::DEPTH_FORMAT;
-
-    VkGraphicsPipelineCreateInfo info{VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO};
-    info.pNext = &renderingInfo;
-    info.stageCount = static_cast<uint32_t>(shaderStages.size());
-    info.pStages = shaderStages.data();
-    info.pVertexInputState = &vertexStateInfo;
-    info.pInputAssemblyState = &inputAssembly;
-    info.pViewportState = &viewportState;
-    info.pRasterizationState = &rasterInfo;
-    info.pMultisampleState = &multisampleState;
-    info.pDepthStencilState = &depthStencilState;
-    info.pColorBlendState = &blendStateInfo;
-    info.pDynamicState = &dynamicStateInfo;
-    info.layout = m_pipelineLayout;
-    info.renderPass = VK_NULL_HANDLE;
-    info.subpass = 0;
-
-    vkCreateGraphicsPipelines(Global::g_device, VK_NULL_HANDLE, 1, &info, nullptr, &m_pipeline);
-
-    //delete shader modules
+    // Imgui makes its own pipeline
 }

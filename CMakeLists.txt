@@ -1,14 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
 include(FetchContent)
-
-# set(NVIDIA_GPU ON)
-
-# if(NVIDIA_GPU)
-#     project(Orbital LANGUAGES CXX CUDA)
-# else()
-#     project(Orbital LANGUAGES CXX HIP)
-# endif()
 project(Orbital LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -18,12 +10,43 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 
+# ===================RETRIEVE LIBRARIES==================
+
 FetchContent_Declare(
     fastgltf
     GIT_REPOSITORY https://github.com/spnda/fastgltf.git
     GIT_TAG main
 )
 FetchContent_MakeAvailable(fastgltf)
+
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG master
+)
+
+FetchContent_MakeAvailable(imgui)
+
+# ======================SET UP IMGUI=====================
+
+add_library(imgui STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+)
+
+target_include_directories(imgui PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+
+target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw)
+
+# ========================================================
 
 set(SOURCES
         src/main.cpp src/mesh_loader.h src/mesh_loader.cpp shaders/triangle.vert.slang shaders/triangle.frag.slang
@@ -46,7 +69,7 @@ target_compile_definitions(Orbital PUBLIC ROOT="${CMAKE_SOURCE_DIR}/")
 #target_include_directories(Orbital PRIVATE ${fastgltf_SOURCE_DIR})
 target_include_directories(Orbital PUBLIC "src/" "external/")
 
-target_link_libraries(Orbital PUBLIC Vulkan::Vulkan glfw fastgltf::fastgltf)
+target_link_libraries(Orbital PUBLIC Vulkan::Vulkan glfw fastgltf::fastgltf imgui)
 
 add_subdirectory(examples)
 

@@ -592,6 +592,18 @@ void Graphics::render(uint32_t img,
 
     vkBeginCommandBuffer(cmd, &beginInfo);
 
+    // Transition targets to color attachment
+    transitionImageLayout(cmd,
+                          Global::g_render_targets[img].image,
+                          VK_IMAGE_LAYOUT_UNDEFINED,
+                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                          VK_IMAGE_ASPECT_COLOR_BIT,
+                          0,
+                          VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT
+                              | VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT,
+                          VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
+
     // Graphic Passes
     for (auto &pass : graphicsPasses)
         pass->render(&cmd, img);
