@@ -6,8 +6,8 @@
 ForwardPass::ForwardPass(Graphics *graphics)
     : Pass(graphics)
 {
-    m_forwardDepth = graphics->makeImage({Global::WIDTH,
-                                          Global::HEIGHT,
+    m_forwardDepth = graphics->makeImage({m_graphics->getSwapchainSize().width,
+                                          m_graphics->getSwapchainSize().height,
                                           Global::DEPTH_FORMAT,
                                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                                           VK_IMAGE_ASPECT_DEPTH_BIT});
@@ -44,8 +44,8 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
     renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent.width = Global::WIDTH;
-    renderingInfo.renderArea.extent.height = Global::HEIGHT;
+    renderingInfo.renderArea.extent.width = m_graphics->getSwapchainSize().width;
+    renderingInfo.renderArea.extent.height = m_graphics->getSwapchainSize().height;
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachment;
@@ -70,17 +70,17 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     VkViewport vp{};
     vp.x = 0;
-    vp.y = static_cast<float>(Global::HEIGHT);
-    vp.width = static_cast<float>(Global::WIDTH);
-    vp.height = -static_cast<float>(Global::HEIGHT); // Flip viewport for Y up
+    vp.y = static_cast<float>(m_graphics->getSwapchainSize().height);
+    vp.width = static_cast<float>(m_graphics->getSwapchainSize().width);
+    vp.height = -static_cast<float>(m_graphics->getSwapchainSize().height); // Flip viewport for Y up
     vp.minDepth = 0.0f;
     vp.maxDepth = 1.0f;
 
     vkCmdSetViewport(*cmd, 0, 1, &vp);
 
     VkRect2D scissor{};
-    scissor.extent.width = Global::WIDTH;
-    scissor.extent.height = Global::HEIGHT;
+    scissor.extent.width = m_graphics->getSwapchainSize().width;
+    scissor.extent.height = m_graphics->getSwapchainSize().height;
 
     vkCmdSetScissor(*cmd, 0, 1, &scissor);
     vkCmdSetCullMode(*cmd, VK_CULL_MODE_BACK_BIT);

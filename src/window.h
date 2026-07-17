@@ -18,9 +18,11 @@ public:
     Window();
 
     void makeSurface();
+    VkExtent2D getExtent() const;
 
 private:
     WindowState m_state{};
+    VkExtent2D m_extent{Global::g_width, Global::g_height};
 };
 
 #endif // WINDOW_H

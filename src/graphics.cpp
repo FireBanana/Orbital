@@ -146,6 +146,7 @@ void Graphics::makeDevice()
 }
 
 Graphics::Graphics(Window *window)
+    : m_window(window)
 {
     makeInstance();
     makeDevice();
@@ -443,12 +444,12 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
 void Graphics::makeRenderTarget()
 {
     for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
-        auto target = makeImage({Global::WIDTH,
-                                  Global::HEIGHT,
-                                  Global::RENDER_TARGET_FORMAT,
-                                  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                                      | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                                  VK_IMAGE_ASPECT_COLOR_BIT});
+        auto target = makeImage({m_window->getExtent().width,
+                                 m_window->getExtent().height,
+                                 Global::RENDER_TARGET_FORMAT,
+                                 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                                     | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                                 VK_IMAGE_ASPECT_COLOR_BIT});
 
         Global::g_render_targets.push_back(std::move(target));
     }
@@ -465,12 +466,14 @@ void Graphics::makeSwapchain()
     else
         std::cout << "surface capabilities not found" << std::endl;
 
-    if (!(surfaceProperties.supportedUsageFlags & VK_IMAGE_USAGE_STORAGE_BIT))
-        std::cout << "Error! Swapchain does not support using storage images";
-
     VkExtent2D swapchainSize;
-    swapchainSize.width = Global::WIDTH;
-    swapchainSize.height = Global::HEIGHT;
+
+    if (surfaceProperties.currentExtent.width == 0xFFFFFFFF) {
+        swapchainSize = m_window->getExtent();
+    } else {
+        swapchainSize.width = surfaceProperties.currentExtent.width;
+        swapchainSize.height = surfaceProperties.currentExtent.height;
+    }
 
     uint32_t desiredImages = Global::SWAPCHAIN_SIZE; //Assuming more than min
 
@@ -483,10 +486,12 @@ void Graphics::makeSwapchain()
     info.imageArrayLayers = 1;
     info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    info.preTransform
+        = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; // Not optimal on devices that support rotation
     info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     info.clipped = true;
+    info.oldSwapchain = Global::g_swapchain;
 
     if (vkCreateSwapchainKHR(Global::g_device, &info, nullptr, &Global::g_swapchain) == VK_SUCCESS)
         std::cout << "Swapchain made" << std::endl;
@@ -520,6 +525,8 @@ void Graphics::makeSwapchain()
         vkCreateImageView(Global::g_device, &viewInfo, nullptr, &Global::g_swapchain_views[i]);
     }
 }
+
+void Graphics::recreateSwapchain() {}
 
 void Graphics::transitionImageLayout(VkCommandBuffer cmd,
                            VkImage img,
@@ -638,12 +645,12 @@ void Graphics::render(uint32_t img,
 
     VkImageBlit2 blitRegion{.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr};
 
-    blitRegion.srcOffsets[1].x = Global::WIDTH;
-    blitRegion.srcOffsets[1].y = Global::HEIGHT;
+    blitRegion.srcOffsets[1].x = m_window->getExtent().width;
+    blitRegion.srcOffsets[1].y = m_window->getExtent().height;
     blitRegion.srcOffsets[1].z = 1;
 
-    blitRegion.dstOffsets[1].x = Global::WIDTH;
-    blitRegion.dstOffsets[1].y = Global::HEIGHT;
+    blitRegion.dstOffsets[1].x = m_window->getExtent().width;
+    blitRegion.dstOffsets[1].y = m_window->getExtent().height;
     blitRegion.dstOffsets[1].z = 1;
 
     blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -795,16 +802,24 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
 {
     Global::g_gui_thread = std::thread([&]() {
         while (!glfwWindowShouldClose(Global::g_window)) {
+            if (Global::g_swapchain_dirty)
+                recreateSwapchain();
+
             uint32_t frame;
+
             auto r = acquireSwapchainImage(&frame);
 
-            if (r != VK_SUCCESS) {
-                vkQueueWaitIdle(Global::g_queue);
+            if (r == VK_ERROR_OUT_OF_DATE_KHR) {
+                //vkQueueWaitIdle(Global::g_queue);
+                recreateSwapchain();
                 continue;
             }
 
             render(frame, graphicsPasses, computePasses);
-            presentImage(frame);
+            r = presentImage(frame);
+
+            if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR)
+                recreateSwapchain();
 
             glfwPollEvents();
         }
@@ -842,4 +857,9 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
     }
 
     Global::g_gui_thread.join();
+}
+
+VkExtent2D Graphics::getSwapchainSize() const
+{
+    return m_window->getExtent();
 }

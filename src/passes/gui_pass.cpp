@@ -87,8 +87,8 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
     renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent.width = Global::WIDTH;
-    renderingInfo.renderArea.extent.height = Global::HEIGHT;
+    renderingInfo.renderArea.extent.width = m_graphics->getSwapchainSize().width;
+    renderingInfo.renderArea.extent.height = m_graphics->getSwapchainSize().height;
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachment;

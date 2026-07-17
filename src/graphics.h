@@ -116,6 +116,8 @@ public:
                          std::vector<Pass *> &computePasses,
                          std::function<void(double)> updateFn);
 
+    VkExtent2D getSwapchainSize() const;
+
 private:
     uint32_t findMemoryType(VkPhysicalDevice phyDevice,
                             uint32_t filterType,
@@ -126,6 +128,8 @@ private:
     void makeDevice();
 
     void makeSwapchain();
+
+    void recreateSwapchain();
 
     void makeRenderTarget();
 
@@ -138,6 +142,8 @@ private:
     VkResult presentImage(uint32_t index);
 
     VkResult acquireSwapchainImage(uint32_t *img);
+
+    Window *m_window;
 };
 
 #endif // GRAPHICS_H

@@ -10,7 +10,7 @@ Window::Window()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_DECORATED, GL_TRUE);
 
-    Global::g_window = glfwCreateWindow(Global::WIDTH, Global::HEIGHT, "Orbital", NULL, NULL);
+    Global::g_window = glfwCreateWindow(m_extent.width, m_extent.height, "Orbital", NULL, NULL);
 
     if (!Global::g_window)
         throw;
@@ -75,6 +75,12 @@ Window::Window()
                         state->cameraDistance
                             * (glm::cos(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)));
     });
+
+    glfwSetFramebufferSizeCallback(Global::g_window, [](GLFWwindow *window, int width, int height) {
+        Global::g_swapchain_dirty = true;
+        Global::g_width = width;
+        Global::g_height = height;
+    });
 }
 
 void Window::makeSurface()
@@ -87,4 +93,9 @@ void Window::makeSurface()
         std::cout << "Surface creation good" << std::endl;
     else
         std::cout << "Surface creation failed " << res << std::endl;
+}
+
+VkExtent2D Window::getExtent() const
+{
+    return m_extent;
 }
