@@ -10,7 +10,11 @@ Window::Window()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_DECORATED, GL_TRUE);
 
-    Global::g_window = glfwCreateWindow(m_extent.width, m_extent.height, "Orbital", NULL, NULL);
+    Global::g_window = glfwCreateWindow(m_state.extent.width,
+                                        m_state.extent.height,
+                                        "Orbital",
+                                        NULL,
+                                        NULL);
 
     if (!Global::g_window)
         throw;
@@ -77,7 +81,10 @@ Window::Window()
     });
 
     glfwSetFramebufferSizeCallback(Global::g_window, [](GLFWwindow *window, int width, int height) {
+        auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
+
         Global::g_swapchain_dirty = true;
+        state->extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
         Global::g_width = width;
         Global::g_height = height;
     });
@@ -97,5 +104,5 @@ void Window::makeSurface()
 
 VkExtent2D Window::getExtent() const
 {
-    return m_extent;
+    return m_state.extent;
 }

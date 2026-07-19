@@ -152,7 +152,6 @@ Graphics::Graphics(Window *window)
     makeDevice();
     window->makeSurface();
     makeSwapchain();
-    makeRenderTarget();
 }
 
 Buffer Graphics::makeBuffer(BufferDescription desc, void *data)
@@ -441,8 +440,19 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
     return result;
 }
 
-void Graphics::makeRenderTarget()
+void Graphics::makeRenderTarget(bool isRecreate)
 {
+    if (isRecreate) {
+        for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
+            vkDestroyImage(Global::g_device, Global::g_render_targets[i].image, nullptr);
+            vkDestroyImageView(Global::g_device, Global::g_render_targets[i].view, nullptr);
+        }
+
+        Global::g_render_targets.clear();
+    } else if (Global::g_render_targets.size() != 0) {
+        std::cout << "Error, swapchain images being created without swapchain recreation!";
+    }
+
     for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
         auto target = makeImage({m_window->getExtent().width,
                                  m_window->getExtent().height,
@@ -457,6 +467,11 @@ void Graphics::makeRenderTarget()
 
 void Graphics::makeSwapchain()
 {
+    bool isRecreate = Global::g_swapchain != VK_NULL_HANDLE;
+
+    if (isRecreate)
+        vkDeviceWaitIdle(Global::g_device);
+
     VkSurfaceCapabilitiesKHR surfaceProperties;
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(Global::g_physical_device,
                                                   Global::g_surface,
@@ -465,6 +480,8 @@ void Graphics::makeSwapchain()
         std::cout << "surface capabilities found" << std::endl;
     else
         std::cout << "surface capabilities not found" << std::endl;
+
+    makeRenderTarget(isRecreate);
 
     VkExtent2D swapchainSize;
 
@@ -507,10 +524,14 @@ void Graphics::makeSwapchain()
                             &imgCount,
                             Global::g_swapchain_images.data());
 
-    for (int i = 0; i < imgCount; ++i)
-        initPerFrame(i);
+    if (!isRecreate)
+        for (int i = 0; i < imgCount; ++i)
+            initPerFrame(i);
 
     for (auto i = 0; i < imgCount; ++i) {
+        if (isRecreate)
+            vkDestroyImageView(Global::g_device, Global::g_swapchain_views[i], nullptr);
+
         VkImageViewCreateInfo viewInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         viewInfo.flags = 0;
         viewInfo.image = Global::g_swapchain_images[i];
@@ -526,7 +547,13 @@ void Graphics::makeSwapchain()
     }
 }
 
-void Graphics::recreateSwapchain() {}
+void Graphics::recreateSwapchain()
+{
+    //cleanup
+    Global::g_swapchain_dirty = true;
+    makeSwapchain();
+    Global::g_swapchain_dirty = false;
+}
 
 void Graphics::transitionImageLayout(VkCommandBuffer cmd,
                            VkImage img,

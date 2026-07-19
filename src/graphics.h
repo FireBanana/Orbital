@@ -131,7 +131,7 @@ private:
 
     void recreateSwapchain();
 
-    void makeRenderTarget();
+    void makeRenderTarget(bool isRecreate);
 
     void initPerFrame(int index);
 

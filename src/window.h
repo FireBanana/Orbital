@@ -10,6 +10,7 @@ struct WindowState
     double xDelta = 0.0;
     double yDelta = 0.0;
     double cameraDistance = Global::g_camera_position.z;
+    VkExtent2D extent{Global::g_width, Global::g_height};
 };
 
 class Window
@@ -22,7 +23,6 @@ public:
 
 private:
     WindowState m_state{};
-    VkExtent2D m_extent{Global::g_width, Global::g_height};
 };
 
 #endif // WINDOW_H
