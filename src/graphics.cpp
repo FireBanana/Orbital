@@ -437,6 +437,7 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
     }
 
     result.isValid = true;
+    result.description = desc;
     return result;
 }
 
@@ -547,11 +548,30 @@ void Graphics::makeSwapchain()
     }
 }
 
-void Graphics::recreateSwapchain()
+void Graphics::recreateSwapchain(std::vector<Pass *> &graphicPasses)
 {
     //cleanup
     Global::g_swapchain_dirty = true;
     makeSwapchain();
+
+    for(auto p : graphicPasses) {
+        if (!p->m_isUsingEngineTargets) {
+            // Resize color targets here
+        }
+
+        if (p->m_depth != nullptr) {
+            vkDestroyImageView(Global::g_device, p->m_depth->view, nullptr);
+            vkDestroyImage(Global::g_device, p->m_depth->image, nullptr);
+            vkFreeMemory(Global::g_device, p->m_depth->memory, nullptr);
+
+            auto newDesc = p->m_depth->description;
+            newDesc.width = m_window->getExtent().width;
+            newDesc.height = m_window->getExtent().height;
+
+            *p->m_depth = makeImage(newDesc);
+        }
+    }
+
     Global::g_swapchain_dirty = false;
 }
 
@@ -830,7 +850,7 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
     Global::g_gui_thread = std::thread([&]() {
         while (!glfwWindowShouldClose(Global::g_window)) {
             if (Global::g_swapchain_dirty)
-                recreateSwapchain();
+                recreateSwapchain(graphicsPasses);
 
             uint32_t frame;
 
@@ -838,7 +858,7 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
 
             if (r == VK_ERROR_OUT_OF_DATE_KHR) {
                 //vkQueueWaitIdle(Global::g_queue);
-                recreateSwapchain();
+                recreateSwapchain(graphicsPasses);
                 continue;
             }
 
@@ -846,7 +866,7 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
             r = presentImage(frame);
 
             if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR)
-                recreateSwapchain();
+                recreateSwapchain(graphicsPasses);
 
             glfwPollEvents();
         }

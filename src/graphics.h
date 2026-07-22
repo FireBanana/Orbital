@@ -71,6 +71,7 @@ struct Texture
     VkSampler sampler;
     VkExtent2D extent;
     uint32_t mipLevels;
+    TextureDescription description;
 };
 
 struct NativeModel
@@ -129,7 +130,7 @@ private:
 
     void makeSwapchain();
 
-    void recreateSwapchain();
+    void recreateSwapchain(std::vector<Pass *> &graphicPasses);
 
     void makeRenderTarget(bool isRecreate);
 

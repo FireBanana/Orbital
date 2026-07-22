@@ -12,7 +12,7 @@ ForwardPass::ForwardPass(Graphics *graphics)
                                           VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                                           VK_IMAGE_ASPECT_DEPTH_BIT});
 
-    addAttachments(&Global::g_render_targets);
+    addAttachments();
     addDepth(&m_forwardDepth);
 
     createSampler();
@@ -89,6 +89,13 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     if (m_models != nullptr) {
         for (auto &model : *m_models) {
             // updates go here
+
+            Global::g_projection
+                = glm::perspectiveZO(glm::radians(60.0f),
+                                     static_cast<float>(m_graphics->getSwapchainSize().width)
+                                         / static_cast<float>(m_graphics->getSwapchainSize().height),
+                                     0.1f,
+                                     1000.0f);
 
             Global::g_view = glm::lookAt(Global::g_camera_position,
                                          glm::vec3(0, 0, 0),
