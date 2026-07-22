@@ -658,6 +658,27 @@ void Graphics::render(uint32_t img,
                           VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT,
                           VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT);
 
+    // Render target clear pass ====
+    VkClearValue clearValue{};
+    clearValue.color = {{0, 0, 0, 1}};
+
+    VkRenderingAttachmentInfo clearAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    clearAttachment.imageView = Global::g_render_targets[img].view;
+    clearAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    clearAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    clearAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    clearAttachment.clearValue = clearValue;
+
+    VkRenderingInfo clearInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    clearInfo.renderArea = {{0, 0}, m_window->getExtent()};
+    clearInfo.layerCount = 1;
+    clearInfo.colorAttachmentCount = 1;
+    clearInfo.pColorAttachments = &clearAttachment;
+
+    vkCmdBeginRendering(cmd, &clearInfo);
+    vkCmdEndRendering(cmd);
+    //================================
+
     // Graphic Passes
     for (auto &pass : graphicsPasses)
         pass->render(&cmd, img);

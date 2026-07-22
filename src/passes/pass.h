@@ -42,7 +42,7 @@ protected:
     std::vector<NativeModel> *m_models = nullptr;
     std::vector<Texture> *m_textures = nullptr;
     std::vector<Texture> *m_attachments = nullptr;
-    Texture *m_depth;
+    Texture *m_depth = nullptr;
 
 private:
     bool m_isUsingEngineTargets = false;
