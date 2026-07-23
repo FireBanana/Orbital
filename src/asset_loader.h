@@ -5,10 +5,11 @@
 #include <fastgltf/core.hpp>
 #include <string>
 
-class MeshLoader
+class AssetLoader
 {
 public:
     static Model loadModel(const std::string &path);
+    static Image loadImage(const std::string &path);
 
 private:
     static Mesh loadMesh(fastgltf::Expected<fastgltf::Asset> &asset);

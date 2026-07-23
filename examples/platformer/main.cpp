@@ -1,6 +1,6 @@
 #include "graphics.h"
+#include "twodpass.h"
 #include "window.h"
-#include <passes/forward_pass.h>
 #include <passes/gui_pass.h>
 
 int main()
@@ -9,9 +9,9 @@ int main()
     Graphics g{&w};
 
     GuiPass gPass{&g};
-    ForwardPass fPass{&g};
+    TwoDPass tdPass{&g};
 
-    std::vector<Pass *> gPasses{&gPass};
+    std::vector<Pass *> gPasses{&tdPass, &gPass};
     std::vector<Pass *> cPasses{};
 
     g.beginRenderLoop(gPasses, cPasses, [](double t) {});

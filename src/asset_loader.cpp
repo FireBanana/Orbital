@@ -1,11 +1,11 @@
 #define STB_IMAGE_IMPLEMENTATION
-#include "mesh_loader.h"
+#include "asset_loader.h"
 #include "fastgltf/math.hpp"
 #include "fastgltf/tools.hpp"
 #include "stb_image.h"
 #include <iostream>
 
-Model MeshLoader::loadModel(const std::string &path)
+Model AssetLoader::loadModel(const std::string &path)
 {
     auto file = fastgltf::GltfDataBuffer::FromPath(path);
     fastgltf::Parser parser{};
@@ -27,7 +27,21 @@ Model MeshLoader::loadModel(const std::string &path)
     return {loadImage(asset), loadMesh(asset)};
 }
 
-Mesh MeshLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
+Image AssetLoader::loadImage(const std::string &path)
+{
+    int width, height, channels;
+    auto *img = stbi_load(path.c_str(), &width, &height, &channels, 4);
+
+    if (img == nullptr)
+        throw;
+
+    return {static_cast<uint32_t>(width),
+            static_cast<uint32_t>(height),
+            static_cast<uint32_t>(channels),
+            img};
+}
+
+Mesh AssetLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
 {
     auto &mesh = asset->meshes[0];
 
@@ -76,7 +90,7 @@ Mesh MeshLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
     return {vertices, indices};
 }
 
-std::vector<Image> MeshLoader::loadImage(fastgltf::Expected<fastgltf::Asset> &asset)
+std::vector<Image> AssetLoader::loadImage(fastgltf::Expected<fastgltf::Asset> &asset)
 {
     std::vector<Image> result;
 

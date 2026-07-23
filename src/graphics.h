@@ -3,7 +3,7 @@
 
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
-#include "mesh_loader.h"
+#include "asset_loader.h"
 
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>

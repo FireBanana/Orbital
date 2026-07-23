@@ -17,8 +17,8 @@ int main()
 
     // ===== Load assets ======
 
-    auto earthAsset = MeshLoader::loadModel(ROOT "assets/earth.glb");
-    auto monkeyAsset = MeshLoader::loadModel(ROOT "assets/monkey.glb");
+    auto earthAsset = AssetLoader::loadModel(ROOT "assets/earth.glb");
+    auto monkeyAsset = AssetLoader::loadModel(ROOT "assets/monkey.glb");
 
     auto monkey = graphics.makeNativeModel(monkeyAsset);
     auto earth = graphics.makeNativeModel(earthAsset);
