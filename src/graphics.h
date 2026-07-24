@@ -145,6 +145,7 @@ private:
     VkResult acquireSwapchainImage(uint32_t *img);
 
     Window *m_window;
+    VkExtent2D m_swapchainSize{0, 0};
 };
 
 #endif // GRAPHICS_H

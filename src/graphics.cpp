@@ -447,6 +447,7 @@ void Graphics::makeRenderTarget(bool isRecreate)
         for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
             vkDestroyImage(Global::g_device, Global::g_render_targets[i].image, nullptr);
             vkDestroyImageView(Global::g_device, Global::g_render_targets[i].view, nullptr);
+            vkFreeMemory(Global::g_device, Global::g_render_targets[i].memory, nullptr);
         }
 
         Global::g_render_targets.clear();
@@ -455,8 +456,8 @@ void Graphics::makeRenderTarget(bool isRecreate)
     }
 
     for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
-        auto target = makeImage({m_window->getExtent().width,
-                                 m_window->getExtent().height,
+        auto target = makeImage({m_swapchainSize.width,
+                                 m_swapchainSize.height,
                                  Global::RENDER_TARGET_FORMAT,
                                  VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
                                      | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -468,7 +469,8 @@ void Graphics::makeRenderTarget(bool isRecreate)
 
 void Graphics::makeSwapchain()
 {
-    bool isRecreate = Global::g_swapchain != VK_NULL_HANDLE;
+    auto oldSwapchain = Global::g_swapchain;
+    bool isRecreate = oldSwapchain != VK_NULL_HANDLE;
 
     if (isRecreate)
         vkDeviceWaitIdle(Global::g_device);
@@ -482,16 +484,14 @@ void Graphics::makeSwapchain()
     else
         std::cout << "surface capabilities not found" << std::endl;
 
-    makeRenderTarget(isRecreate);
-
-    VkExtent2D swapchainSize;
-
     if (surfaceProperties.currentExtent.width == 0xFFFFFFFF) {
-        swapchainSize = m_window->getExtent();
+        m_swapchainSize = m_window->getExtent();
     } else {
-        swapchainSize.width = surfaceProperties.currentExtent.width;
-        swapchainSize.height = surfaceProperties.currentExtent.height;
+        m_swapchainSize.width = surfaceProperties.currentExtent.width;
+        m_swapchainSize.height = surfaceProperties.currentExtent.height;
     }
+
+    makeRenderTarget(isRecreate);
 
     uint32_t desiredImages = Global::SWAPCHAIN_SIZE; //Assuming more than min
 
@@ -500,7 +500,7 @@ void Graphics::makeSwapchain()
     info.minImageCount = desiredImages;
     info.imageFormat = Global::FORMAT; //Assuming we have this
     info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-    info.imageExtent = swapchainSize;
+    info.imageExtent = m_swapchainSize;
     info.imageArrayLayers = 1;
     info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -509,7 +509,7 @@ void Graphics::makeSwapchain()
     info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     info.clipped = true;
-    info.oldSwapchain = Global::g_swapchain;
+    info.oldSwapchain = oldSwapchain;
 
     if (vkCreateSwapchainKHR(Global::g_device, &info, nullptr, &Global::g_swapchain) == VK_SUCCESS)
         std::cout << "Swapchain made" << std::endl;
@@ -546,6 +546,9 @@ void Graphics::makeSwapchain()
 
         vkCreateImageView(Global::g_device, &viewInfo, nullptr, &Global::g_swapchain_views[i]);
     }
+
+    if (oldSwapchain != VK_NULL_HANDLE)
+        vkDestroySwapchainKHR(Global::g_device, oldSwapchain, nullptr);
 }
 
 void Graphics::recreateSwapchain(std::vector<Pass *> &graphicPasses)
@@ -565,8 +568,8 @@ void Graphics::recreateSwapchain(std::vector<Pass *> &graphicPasses)
             vkFreeMemory(Global::g_device, p->m_depth->memory, nullptr);
 
             auto newDesc = p->m_depth->description;
-            newDesc.width = m_window->getExtent().width;
-            newDesc.height = m_window->getExtent().height;
+            newDesc.width = m_swapchainSize.width;
+            newDesc.height = m_swapchainSize.height;
 
             *p->m_depth = makeImage(newDesc);
         }
@@ -670,7 +673,7 @@ void Graphics::render(uint32_t img,
     clearAttachment.clearValue = clearValue;
 
     VkRenderingInfo clearInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
-    clearInfo.renderArea = {{0, 0}, m_window->getExtent()};
+    clearInfo.renderArea = {{0, 0}, m_swapchainSize};
     clearInfo.layerCount = 1;
     clearInfo.colorAttachmentCount = 1;
     clearInfo.pColorAttachments = &clearAttachment;
@@ -713,12 +716,12 @@ void Graphics::render(uint32_t img,
 
     VkImageBlit2 blitRegion{.sType = VK_STRUCTURE_TYPE_IMAGE_BLIT_2, .pNext = nullptr};
 
-    blitRegion.srcOffsets[1].x = m_window->getExtent().width;
-    blitRegion.srcOffsets[1].y = m_window->getExtent().height;
+    blitRegion.srcOffsets[1].x = m_swapchainSize.width;
+    blitRegion.srcOffsets[1].y = m_swapchainSize.height;
     blitRegion.srcOffsets[1].z = 1;
 
-    blitRegion.dstOffsets[1].x = m_window->getExtent().width;
-    blitRegion.dstOffsets[1].y = m_window->getExtent().height;
+    blitRegion.dstOffsets[1].x = m_swapchainSize.width;
+    blitRegion.dstOffsets[1].y = m_swapchainSize.height;
     blitRegion.dstOffsets[1].z = 1;
 
     blitRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -929,5 +932,5 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
 
 VkExtent2D Graphics::getSwapchainSize() const
 {
-    return m_window->getExtent();
+    return m_swapchainSize;
 }

@@ -3,13 +3,67 @@
 #include "passes/forward_pass.h"
 #include "passes/gui_pass.h"
 #include "window.h"
-#include <iostream>
 #include <random>
 
 int main()
 {
     Window w{};
     Graphics graphics{&w};
+
+    // ===== Setup input ======
+
+    bool isPressed;
+    bool newClick;
+    double xDelta = 0, yDelta = 0;
+    double cameraDistance = Global::g_camera_position.z;
+
+    w.registerMouseButton([&isPressed, &newClick](int button, int action, int mod) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT) {
+            if (action == GLFW_PRESS) {
+                isPressed = true;
+                newClick = true;
+            } else if (action == GLFW_RELEASE) {
+                isPressed = false;
+            }
+        }
+    });
+
+    w.registerMousePosition(
+        [&isPressed, &newClick, &xDelta, &yDelta, &cameraDistance](double xp, double yp) {
+            static double lastXPosition = xp, lastYPosition = yp;
+
+            if (!isPressed)
+                return;
+
+            if (newClick) {
+                lastXPosition = xp;
+                lastYPosition = yp;
+                newClick = false;
+            }
+
+            xDelta -= xp - lastXPosition;
+            yDelta += yp - lastYPosition;
+            yDelta = glm::clamp(yDelta, -130.0 + 0.01, 130.0 - 0.01);
+
+            Global::g_camera_position
+                = glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+                            cameraDistance * (glm::sin(yDelta * 0.01)),
+                            cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01)));
+
+            lastXPosition = xp;
+            lastYPosition = yp;
+        });
+
+    w.registerMouseScroll([&cameraDistance, &xDelta, &yDelta](double xoffset, double yoffset) {
+        cameraDistance -= yoffset * 0.2;
+
+        Global::g_camera_position
+            = glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+                        cameraDistance * (glm::sin(yDelta * 0.01)),
+                        cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01)));
+    });
+
+    // ===== Make Psses =======
 
     ForwardPass fPass{&graphics};
     GuiPass gPass{&graphics};
