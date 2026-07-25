@@ -15,7 +15,9 @@ int main()
     bool isPressed;
     bool newClick;
     double xDelta = 0, yDelta = 0;
-    double cameraDistance = Global::g_camera_position.z;
+    double cameraDistance = 3;
+
+    ForwardPass fPass{&graphics};
 
     w.registerMouseButton([&isPressed, &newClick](int button, int action, int mod) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -29,7 +31,7 @@ int main()
     });
 
     w.registerMousePosition(
-        [&isPressed, &newClick, &xDelta, &yDelta, &cameraDistance](double xp, double yp) {
+        [&isPressed, &newClick, &xDelta, &yDelta, &cameraDistance, &fPass](double xp, double yp) {
             static double lastXPosition = xp, lastYPosition = yp;
 
             if (!isPressed)
@@ -45,27 +47,27 @@ int main()
             yDelta += yp - lastYPosition;
             yDelta = glm::clamp(yDelta, -130.0 + 0.01, 130.0 - 0.01);
 
-            Global::g_camera_position
-                = glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
-                            cameraDistance * (glm::sin(yDelta * 0.01)),
-                            cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01)));
+            fPass.setCameraPosition(
+                glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+                          cameraDistance * (glm::sin(yDelta * 0.01)),
+                          cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
 
             lastXPosition = xp;
             lastYPosition = yp;
         });
 
-    w.registerMouseScroll([&cameraDistance, &xDelta, &yDelta](double xoffset, double yoffset) {
-        cameraDistance -= yoffset * 0.2;
+    w.registerMouseScroll(
+        [&cameraDistance, &xDelta, &yDelta, &fPass](double xoffset, double yoffset) {
+            cameraDistance -= yoffset * 0.2;
 
-        Global::g_camera_position
-            = glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
-                        cameraDistance * (glm::sin(yDelta * 0.01)),
-                        cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01)));
-    });
+            fPass.setCameraPosition(
+                glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+                          cameraDistance * (glm::sin(yDelta * 0.01)),
+                          cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
+        });
 
     // ===== Make Psses =======
 
-    ForwardPass fPass{&graphics};
     GuiPass gPass{&graphics};
     GravityComputePass gcPass{&graphics};
 

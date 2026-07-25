@@ -29,16 +29,6 @@ inline VkSwapchainKHR g_swapchain = VK_NULL_HANDLE;
 inline std::vector<Texture> g_render_targets;
 inline bool g_swapchain_dirty = false;
 
-inline glm::vec3 g_camera_position = glm::vec3(0., 0., 3.0);
-inline glm::mat4 g_model = glm::mat4(1.0f);
-inline glm::mat4 g_view = glm::lookAtRH(g_camera_position, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-inline glm::mat4 g_projection = glm::perspectiveZO(glm::radians(60.0f),
-                                                   (float) g_width / (float) g_height,
-                                                   0.1f,
-                                                   1000.0f);
-
-inline UniformConstants g_constants = {g_model, g_view, g_projection, glm::vec4(1.)};
-
 inline std::vector<VkImage> g_swapchain_images;
 inline std::vector<VkImageView> g_swapchain_views;
 

@@ -90,27 +90,23 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
         for (auto &model : *m_models) {
             // updates go here
 
-            Global::g_projection
-                = glm::perspectiveZO(glm::radians(60.0f),
-                                     static_cast<float>(m_graphics->getSwapchainSize().width)
-                                         / static_cast<float>(m_graphics->getSwapchainSize().height),
-                                     0.1f,
-                                     1000.0f);
+            m_projection = glm::perspectiveZO(glm::radians(60.0f),
+                                              static_cast<float>(
+                                                  m_graphics->getSwapchainSize().width)
+                                                  / static_cast<float>(
+                                                      m_graphics->getSwapchainSize().height),
+                                              0.1f,
+                                              1000.0f);
 
-            Global::g_view = glm::lookAt(Global::g_camera_position,
-                                         glm::vec3(0, 0, 0),
-                                         glm::vec3(0, 1, 0));
-            Global::g_constants = {glm::translate(glm::mat4(1.0f),
-                                                  glm::vec3(model.position.x,
-                                                            model.position.y,
-                                                            model.position.z)),
-                                   Global::g_view,
-                                   Global::g_projection,
-                                   glm::vec4(Global::g_camera_position.x,
-                                             Global::g_camera_position.y,
-                                             Global::g_camera_position.z,
-                                             0),
-                                   0};
+            m_view = glm::lookAt(m_cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+            m_constants = {glm::translate(glm::mat4(1.0f),
+                                          glm::vec3(model.position.x,
+                                                    model.position.y,
+                                                    model.position.z)),
+                           m_view,
+                           m_projection,
+                           glm::vec4(m_cameraPosition.x, m_cameraPosition.y, m_cameraPosition.z, 0),
+                           0};
             //
 
             vkCmdPushConstants(*cmd,
@@ -118,7 +114,7 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                                VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
                                0,
                                sizeof(UniformConstants),
-                               &Global::g_constants);
+                               &m_constants);
 
             VkDeviceSize offset{0};
             vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
@@ -147,6 +143,11 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     }
 
     vkCmdEndRendering(*cmd);
+}
+
+void ForwardPass::setCameraPosition(glm::vec3 position)
+{
+    m_cameraPosition = position;
 }
 
 void ForwardPass::createPipeline()

@@ -62,6 +62,9 @@ void TwoDPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     vkCmdBeginRendering(*cmd, &renderingInfo);
 
+    m_Sprite->screenWidth = m_graphics->getSwapchainSize().width;
+    m_Sprite->screenHeight = m_graphics->getSwapchainSize().height;
+
     vkCmdPushConstants(*cmd,
                        m_pipelineLayout,
                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,

@@ -21,7 +21,7 @@ int main()
                     10,
                     300,
                     300,
-                    8,
+                    6,
                     1,
                     0,
                     static_cast<float>(g.getSwapchainSize().width),
