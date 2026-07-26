@@ -2,6 +2,7 @@
 #include "gtypes.h"
 #include "twodpass.h"
 #include "window.h"
+#include <iostream>
 #include <passes/gui_pass.h>
 
 struct Movement
@@ -17,10 +18,10 @@ int main()
     Window w{};
     Graphics g{&w};
 
-    Sprite mainChar{10,
-                    10,
-                    300,
-                    300,
+    Sprite mainChar{0,
+                    0,
+                    64,
+                    64,
                     6,
                     1,
                     0,
@@ -68,6 +69,9 @@ int main()
 
     g.beginRenderLoop(gPasses, cPasses, [&tdPass, &mainChar, &m](double t) {
         static int d = 0;
+        static float initialVel = 0;
+        static double jumpTimeStart = t;
+
         int c = t - d;
 
         if (c >= 50) {
@@ -76,14 +80,23 @@ int main()
             mainChar.incrementIdleIndex();
         }
 
+        float v = initialVel + (-9.81 * 0.005) * (t - jumpTimeStart);
+        std::cout << v << std::endl;
+        mainChar.y += v;
+
+        if (mainChar.y < 0) {
+            mainChar.y = 0;
+        }
+
         if (m.right)
             mainChar.x += 1;
         else if (m.left)
             mainChar.x -= 1;
 
-        if (m.up)
-            mainChar.y += 1;
-        else if (m.down)
+        if (m.up) {
+            initialVel = 8;
+            jumpTimeStart = t;
+        } else if (m.down)
             mainChar.y -= 1;
     });
 }

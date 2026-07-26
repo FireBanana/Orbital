@@ -507,7 +507,7 @@ void Graphics::makeSwapchain()
     info.preTransform
         = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; // Not optimal on devices that support rotation
     info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
-    info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    info.compositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
     info.clipped = true;
     info.oldSwapchain = oldSwapchain;
 
@@ -663,7 +663,7 @@ void Graphics::render(uint32_t img,
 
     // Render target clear pass ====
     VkClearValue clearValue{};
-    clearValue.color = {{0, 0, 0, 1}};
+    clearValue.color = {{0, 0, 0, 0}};
 
     VkRenderingAttachmentInfo clearAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
     clearAttachment.imageView = Global::g_render_targets[img].view;

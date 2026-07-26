@@ -36,5 +36,10 @@ float4 main(VSInput input) : SV_Target
     float2 uv = cellOrigin + frac(input.uv) * cellSize;
     uv.y = 1. - uv.y;
 
-    return sprite.Sample(uv);
+    float4 col = sprite.Sample(uv);
+
+    if(col.a < 0.5)
+        discard;
+
+    return col;
 }
