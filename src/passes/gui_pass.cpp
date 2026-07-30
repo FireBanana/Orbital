@@ -98,12 +98,41 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     ImGui::NewFrame();
 
     // your UI
-    ImGui::ShowDemoWindow(); // or your own windows
-    ImGui::Render();         // finalizes draw data, does NOT touch Vulkan
+    //ImGui::ShowDemoWindow(); // or your own windows
+
+    ImDrawList *drawList = ImGui::GetBackgroundDrawList();
+
+    const float h = ImGui::GetIO().DisplaySize.y;
+    for (auto r : m_debugRects) {
+        // r = {x, y, width, height} in Y-up sprite space (origin bottom-left)
+        const float top = h - (r.y + r.height); // sprite top edge  -> ImGui min-Y
+        const float bottom = h - r.y;           // sprite bottom    -> ImGui max-Y
+
+        drawList->AddRect({r.x, top}, {r.x + r.width, bottom}, IM_COL32(255, 255, 0, 255));
+    }
+
+    for (auto [first, second] : m_debugLines) {
+        drawList->AddLine({first.u, first.v}, {second.u, second.v}, IM_COL32(255, 255, 0, 255));
+    }
+
+    ImGui::Render(); // finalizes draw data, does NOT touch Vulkan
 
     vkCmdBeginRendering(*cmd, &renderingInfo);
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *cmd);
     vkCmdEndRendering(*cmd);
+
+    m_debugRects.clear();
+    m_debugLines.clear();
+}
+
+void GuiPass::drawDebugRect(Rect rect)
+{
+    m_debugRects.push_back(rect);
+}
+
+void GuiPass::drawDebugLines(std::tuple<vec2, vec2> line)
+{
+    m_debugLines.push_back(line);
 }
 
 void GuiPass::createPipeline()

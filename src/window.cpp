@@ -8,6 +8,7 @@ Window::Window()
         std::cout << "Issues!";
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
     glfwWindowHint(GLFW_DECORATED, GL_TRUE);
 
     Global::g_window = glfwCreateWindow(m_state.extent.width,

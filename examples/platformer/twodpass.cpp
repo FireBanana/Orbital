@@ -4,15 +4,6 @@
 TwoDPass::TwoDPass(Graphics *g)
     : Pass(g)
 {
-    m_mainCharIdle = AssetLoader::loadImage(ROOT "examples/platformer/assets/walk.png");
-    m_mainCharIdleTex = g->makeImage({m_mainCharIdle.width,
-                                      m_mainCharIdle.height,
-                                      VK_FORMAT_R8G8B8A8_SRGB,
-                                      VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                      VK_IMAGE_ASPECT_COLOR_BIT},
-                                     &m_mainCharIdle);
-    //makeimage
-
     addAttachments();
 
     createSampler();
@@ -62,30 +53,37 @@ void TwoDPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     vkCmdBeginRendering(*cmd, &renderingInfo);
 
-    m_Sprite->screenWidth = m_graphics->getSwapchainSize().width;
-    m_Sprite->screenHeight = m_graphics->getSwapchainSize().height;
+    for (auto sprite : m_Sprites) {
+        sprite->screenWidth = m_graphics->getSwapchainSize().width;
+        sprite->screenHeight = m_graphics->getSwapchainSize().height;
 
-    vkCmdPushConstants(*cmd,
-                       m_pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0,
-                       sizeof(Sprite),
-                       m_Sprite);
+        vkCmdPushConstants(*cmd,
+                           m_pipelineLayout,
+                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0,
+                           sizeof(Sprite),
+                           sprite);
 
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = m_mainCharIdleTex.view;
-    imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = sprite->texture->view;
+        imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
-    VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    writeSet.dstBinding = 0;
-    writeSet.descriptorCount = 1;
-    writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    writeSet.pImageInfo = &imageInfo;
+        VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+        writeSet.dstBinding = 0;
+        writeSet.descriptorCount = 1;
+        writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writeSet.pImageInfo = &imageInfo;
 
-    vkCmdPushDescriptorSet(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0, 1, &writeSet);
+        vkCmdPushDescriptorSet(*cmd,
+                               VK_PIPELINE_BIND_POINT_GRAPHICS,
+                               m_pipelineLayout,
+                               0,
+                               1,
+                               &writeSet);
 
-    vkCmdDraw(*cmd, 6, 1, 0, 0);
+        vkCmdDraw(*cmd, 6, 1, 0, 0);
+    }
     vkCmdEndRendering(*cmd);
 }
 

@@ -41,5 +41,6 @@ float4 main(VSInput input) : SV_Target
     if(col.a < 0.5)
         discard;
 
+
     return col;
 }

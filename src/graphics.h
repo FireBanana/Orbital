@@ -106,7 +106,7 @@ public:
 
     void beginRenderLoop(std::vector<Pass *> &graphicsPasses,
                          std::vector<Pass *> &computePasses,
-                         std::function<void(double)> updateFn);
+                         std::function<void(double time, double deltaTime)> updateFn);
 
     VkExtent2D getSwapchainSize() const;
 

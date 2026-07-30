@@ -869,7 +869,7 @@ NativeModel Graphics::makeNativeModel(Model &model)
 
 void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
                                std::vector<Pass *> &computePasses,
-                               std::function<void(double)> updateFn)
+                               std::function<void(double time, double deltaTime)> updateFn)
 {
     Global::g_gui_thread = std::thread([&]() {
         while (!glfwWindowShouldClose(Global::g_window)) {
@@ -917,7 +917,7 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
             float delta = std::min(frameTime, dt);
 
             //processing
-            updateFn(t);
+            updateFn(t, delta);
 
             frameTime -= delta;
             t += delta;

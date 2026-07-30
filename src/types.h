@@ -14,6 +14,11 @@ struct vec4
     float x, y, z, w;
 };
 
+struct Rect
+{
+    float x, y, width, height;
+};
+
 struct vec2
 {
     float u, v;

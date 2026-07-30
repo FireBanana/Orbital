@@ -2,24 +2,25 @@
 #include "gtypes.h"
 #include "twodpass.h"
 #include "window.h"
+#include <box2d/box2d.h>
+#include <box2d/types.h>
 #include <iostream>
 #include <passes/gui_pass.h>
-
-struct Movement
-{
-    unsigned int up : 1;
-    unsigned int down : 1;
-    unsigned int left : 1;
-    unsigned int right : 1;
-};
 
 int main()
 {
     Window w{};
     Graphics g{&w};
 
+    std::vector<Sprite> sprites{};
+    std::unordered_map<uint32_t, PhysicsComponent> physicsComponents{};
+
+    auto world = b2DefaultWorldDef();
+    world.gravity = {0.0f, -9.81f};
+    auto worldId = b2CreateWorld(&world);
+
     Sprite mainChar{0,
-                    0,
+                    64,
                     64,
                     64,
                     6,
@@ -27,6 +28,21 @@ int main()
                     0,
                     static_cast<float>(g.getSwapchainSize().width),
                     static_cast<float>(g.getSwapchainSize().height)};
+
+    auto charBodyDef = b2DefaultBodyDef();
+    charBodyDef.type = b2_dynamicBody;
+    charBodyDef.fixedRotation = true;
+    charBodyDef.position = {(mainChar.rect.x / 64.0f) + (32.0f / 64.0f),
+                            (mainChar.rect.y / 64.0f) + (32.0f / 64.0f)};
+    auto charId = b2CreateBody(worldId, &charBodyDef);
+    auto charBox = b2MakeBox(0.5, 0.5);
+    auto charShapeDef = b2DefaultShapeDef();
+    charShapeDef.density = 1.0f;
+    charShapeDef.material.friction = 0.1;
+    auto charShapeId = b2CreatePolygonShape(charId, &charShapeDef, &charBox);
+
+    physicsComponents.insert({0, {charId, charShapeId}});
+
     Movement m{};
 
     w.registerKey([&mainChar, &m](int key, int scancode, int action, int mods) {
@@ -59,44 +75,151 @@ int main()
         }
     });
 
+    auto mainCharIdle = AssetLoader::loadImage(ROOT "examples/platformer/assets/walk.png");
+    auto mainCharIdleTex = g.makeImage({mainCharIdle.width,
+                                        mainCharIdle.height,
+                                        VK_FORMAT_R8G8B8A8_SRGB,
+                                        VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                        VK_IMAGE_ASPECT_COLOR_BIT},
+                                       &mainCharIdle);
+
+    auto floorImg = AssetLoader::loadImage(ROOT "examples/platformer/assets/grassCenter.png");
+    auto floorTexture = g.makeImage({floorImg.width,
+                                     floorImg.height,
+                                     VK_FORMAT_R8G8B8A8_SRGB,
+                                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                     VK_IMAGE_ASPECT_COLOR_BIT},
+                                    &floorImg);
+
+    mainChar.texture = &mainCharIdleTex;
+
+    sprites.push_back(mainChar);
+
     GuiPass gPass{&g};
     TwoDPass tdPass{&g};
 
-    tdPass.setSprite(&mainChar);
+    // width 960, height 960
+    // 15 tiles across
+    const int mapWidth = 15;
+    std::string map = "---------------"
+                      "---------------"
+                      "---------------"
+                      "---------------"
+                      "---------------"
+                      "---------------"
+                      "---------------"
+                      "--------x------"
+                      "---------------"
+                      "----x----------"
+                      "--------x------"
+                      "---------------"
+                      "---------xxxxxx"
+                      "---------------"
+                      "xxxxxx---------";
+
+    for (int x = 0; x < mapWidth; ++x) {
+        for (int y = 0; y < mapWidth; ++y) {
+            auto index = x + mapWidth * y;
+
+            if (map[index] != 'x')
+                continue;
+
+            auto groundBodyDef = b2DefaultBodyDef();
+            groundBodyDef.position = {static_cast<float>(x) + (32.0f / 64.0f),
+                                      static_cast<float>(15 - 1 - y) + (32.0f / 64.0f)};
+            auto groundId = b2CreateBody(worldId, &groundBodyDef);
+            auto groundBox = b2MakeBox(0.5, 0.5);
+            auto groundShapeDef = b2DefaultShapeDef();
+            auto shapeId = b2CreatePolygonShape(groundId, &groundShapeDef, &groundBox);
+
+            sprites.push_back({64.0f * (x),
+                               960.0f - 64.0f - (64.0f * (y)),
+                               64,
+                               64,
+                               1,
+                               1,
+                               0,
+                               static_cast<float>(g.getSwapchainSize().width),
+                               static_cast<float>(g.getSwapchainSize().height),
+                               &floorTexture});
+
+            physicsComponents.insert({static_cast<uint32_t>(index), {groundId, shapeId}});
+        }
+    }
+
+    tdPass.addSprite(sprites.data(), sprites.size());
 
     std::vector<Pass *> gPasses{&tdPass, &gPass};
     std::vector<Pass *> cPasses{};
 
-    g.beginRenderLoop(gPasses, cPasses, [&tdPass, &mainChar, &m](double t) {
-        static int d = 0;
-        static float initialVel = 0;
-        static double jumpTimeStart = t;
+    g.beginRenderLoop(gPasses,
+                      cPasses,
+                      [&tdPass, &sprites, &m, worldId, &physicsComponents, &gPass](double t,
+                                                                                   double delta) {
+                          static int d = 0;
+                          static bool grounded = false;
 
-        int c = t - d;
+                          int c = t - d;
 
-        if (c >= 50) {
-            d = t;
+                          if (c >= 50) {
+                              d = t;
 
-            mainChar.incrementIdleIndex();
-        }
+                              sprites[0].incrementIdleIndex();
+                          }
 
-        float v = initialVel + (-9.81 * 0.005) * (t - jumpTimeStart);
-        std::cout << v << std::endl;
-        mainChar.y += v;
+                          //physics
+                          b2World_Step(worldId, delta / 1000, 4);
+                          auto cPos = b2Body_GetPosition(physicsComponents[0].bodyId);
+                          sprites[0].rect.x = ((cPos.x - 0.5) * 64.0f);
+                          sprites[0].rect.y = ((cPos.y - 0.5) * 64.0f);
 
-        if (mainChar.y < 0) {
-            mainChar.y = 0;
-        }
+                          auto velocity = b2Body_GetLinearVelocity(physicsComponents[0].bodyId);
 
-        if (m.right)
-            mainChar.x += 1;
-        else if (m.left)
-            mainChar.x -= 1;
+                          if (m.up && grounded) {
+                              velocity.y = 6.;
+                              grounded = false;
+                          } else if (m.down) {
+                          }
 
-        if (m.up) {
-            initialVel = 8;
-            jumpTimeStart = t;
-        } else if (m.down)
-            mainChar.y -= 1;
-    });
+                          if (m.right)
+                              velocity.x = 2.5;
+                          else if (m.left)
+                              velocity.x = -2.5;
+
+                          b2Body_SetLinearVelocity(physicsComponents[0].bodyId, velocity);
+
+                          //ground collision
+                          auto capacity = b2Body_GetContactCapacity(physicsComponents[0].bodyId);
+                          std::vector<b2ContactData> contacts{static_cast<size_t>(capacity)};
+                          auto count = b2Body_GetContactData(physicsComponents[0].bodyId,
+                                                             contacts.data(),
+                                                             capacity);
+
+                          for (int i = 0; i < count; ++i) {
+                              auto *m = &contacts[i].manifold;
+
+                              if (m->pointCount == 0)
+                                  continue;
+
+                              auto n = m->normal;
+
+                              if (!B2_ID_EQUALS(contacts[i].shapeIdA, physicsComponents[0].shapeId))
+                                  n = b2Neg(n);
+
+                              if (n.y < 0.7)
+                                  grounded = true;
+                          }
+
+        //debug draw
+#if 1
+                          for (auto &comp : physicsComponents) {
+                              auto shape = b2Shape_GetAABB(comp.second.shapeId);
+                              gPass.drawDebugRect(
+                                  {shape.lowerBound.x * 64.0f,
+                                   shape.lowerBound.y * 64.0f,
+                                   shape.upperBound.x * 64.0f - shape.lowerBound.x * 64.0f,
+                                   shape.upperBound.y * 64.0f - shape.lowerBound.y * 64.0f});
+                          }
+#endif
+                      });
 }

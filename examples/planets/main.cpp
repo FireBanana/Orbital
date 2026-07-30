@@ -74,7 +74,7 @@ int main()
     // ===== Load assets ======
 
     auto earthAsset = AssetLoader::loadModel(ROOT "assets/earth.glb");
-    auto monkeyAsset = AssetLoader::loadModel(ROOT "assets/monkey.glb");
+    auto monkeyAsset = AssetLoader::loadModel(ROOT "assets/earth.glb");
 
     auto monkey = graphics.makeNativeModel(monkeyAsset);
     auto earth = graphics.makeNativeModel(earthAsset);
@@ -117,7 +117,7 @@ int main()
         totalDistance = gameObjects[i].distance;
     }
 
-    auto update = [&renderables, &gameObjects](double t) {
+    auto update = [&renderables, &gameObjects](double t, double dt) {
         for (auto i = 1; i < renderables.size(); ++i) {
             renderables[i].position = {static_cast<float>(glm::sin(gameObjects[i].speed * t)
                                                           * gameObjects[i].distance),

@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.22)
 
 include(FetchContent)
-project(Orbital LANGUAGES CXX)
+project(Orbital LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,6 +27,30 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(imgui)
 
+set(BOX2D_SAMPLES OFF CACHE BOOL "" FORCE)
+set(BOX2D_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BOX2D_BENCHMARKS OFF CACHE BOOL "" FORCE)
+set(BOX2D_DOCS OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    box2d
+    GIT_REPOSITORY https://github.com/erincatto/box2d.git
+    GIT_TAG v3.1.0
+)
+FetchContent_MakeAvailable(box2d)
+
+set(BOX3D_SAMPLES OFF CACHE BOOL "" FORCE)
+set(BOX3D_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BOX3D_BENCHMARKS OFF CACHE BOOL "" FORCE)
+set(BOX3D_DOCS OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    box3d
+    GIT_REPOSITORY https://github.com/erincatto/box3d.git
+    GIT_TAG main
+)
+FetchContent_MakeAvailable(box3d)
+
 # ======================SET UP IMGUI=====================
 
 add_library(imgui STATIC
@@ -38,6 +62,9 @@ add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
     ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
 )
+
+# No support for X11 planned
+target_compile_definitions(imgui PRIVATE IMGUI_IMPL_GLFW_DISABLE_X11)
 
 target_include_directories(imgui PUBLIC
     ${imgui_SOURCE_DIR}
@@ -109,7 +136,7 @@ target_compile_definitions(Orbital PUBLIC ROOT="${CMAKE_SOURCE_DIR}/")
 #target_include_directories(Orbital PRIVATE ${fastgltf_SOURCE_DIR})
 target_include_directories(Orbital PUBLIC "src/" "external/")
 
-target_link_libraries(Orbital PUBLIC Vulkan::Vulkan glfw fastgltf::fastgltf imgui)
+target_link_libraries(Orbital PUBLIC Vulkan::Vulkan glfw fastgltf::fastgltf imgui box2d box3d)
 
 add_subdirectory(examples)
 

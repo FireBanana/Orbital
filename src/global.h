@@ -15,8 +15,8 @@ constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
 constexpr uint32_t SWAPCHAIN_SIZE = 3;
 //constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
-inline uint32_t g_width = 800;
-inline uint32_t g_height = 600;
+inline uint32_t g_width = 960;
+inline uint32_t g_height = 960;
 
 inline GLFWwindow *g_window;
 
