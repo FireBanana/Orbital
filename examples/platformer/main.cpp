@@ -211,7 +211,7 @@ int main()
                           }
 
         //debug draw
-#if 1
+#if 0
                           for (auto &comp : physicsComponents) {
                               auto shape = b2Shape_GetAABB(comp.second.shapeId);
                               gPass.drawDebugRect(

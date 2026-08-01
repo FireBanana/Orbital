@@ -852,7 +852,7 @@ NativeModel Graphics::makeNativeModel(Model &model)
                                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                               model.mesh.vertices.data());
-    auto ibuffer = makeBuffer({sizeof(uint16_t) * model.mesh.indices.size(),
+    auto ibuffer = makeBuffer({sizeof(uint32_t) * model.mesh.indices.size(),
                                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                               model.mesh.indices.data());

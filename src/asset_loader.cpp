@@ -46,7 +46,7 @@ Mesh AssetLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
     auto &mesh = asset->meshes[0];
 
     std::vector<vertex> vertices;
-    std::vector<uint16_t> indices;
+    std::vector<uint32_t> indices;
 
     for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
         auto positionIt = it->findAttribute("POSITION");
@@ -56,12 +56,14 @@ Mesh AssetLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
         auto &primitive = *it;
         auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
 
-        vertices.resize(positionAccessor.count);
+        //vertices.resize(positionAccessor.count);
+        const size_t baseVertex = vertices.size();
+        vertices.resize(baseVertex + positionAccessor.count);
 
         fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
             asset.get(), positionAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                vertices[idx].position = {pos.x(), pos.y(), pos.z()};
-                vertices[idx].uv = {};
+                vertices[baseVertex + idx].position = {pos.x(), pos.y(), pos.z()};
+                vertices[baseVertex + idx].uv = {};
             });
 
         auto &texcoordAccessor = asset->accessors[texcoordIt->accessorIndex];
@@ -78,13 +80,17 @@ Mesh AssetLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
 
         fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
             asset.get(), normalAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                vertices[idx].normal = {pos.x(), pos.y(), pos.z()};
+                vertices[baseVertex + idx].normal = {pos.x(), pos.y(), pos.z()};
             });
 
         auto &indexAccessor = asset->accessors[it->indicesAccessor.value()];
-        indices.resize(indexAccessor.count);
+        const size_t firstIndex = indices.size();
+        indices.resize(firstIndex + indexAccessor.count);
 
-        fastgltf::copyFromAccessor<uint16_t>(asset.get(), indexAccessor, indices.data());
+        fastgltf::copyFromAccessor<uint32_t>(asset.get(), indexAccessor, indices.data());
+
+        for (size_t i = firstIndex; i < indices.size(); ++i)
+            indices[i] += static_cast<uint32_t>(baseVertex);
     }
 
     return {vertices, indices};

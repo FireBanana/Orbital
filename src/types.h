@@ -34,7 +34,7 @@ struct vertex
 struct Mesh
 {
     std::vector<vertex> vertices;
-    std::vector<uint16_t> indices;
+    std::vector<uint32_t> indices;
 };
 
 struct Image

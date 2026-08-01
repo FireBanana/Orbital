@@ -118,7 +118,7 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
             VkDeviceSize offset{0};
             vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
-            vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT16);
+            vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
