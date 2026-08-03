@@ -2,6 +2,7 @@
 #define TYPES_H
 
 #include <cstdint>
+#include <glm/ext/matrix_float4x4.hpp>
 #include <vector>
 
 struct vec3
@@ -35,6 +36,8 @@ struct Mesh
 {
     std::vector<vertex> vertices;
     std::vector<uint32_t> indices;
+    int8_t textureIndex = -1;
+    glm::mat4 worldTransform{1.0f};
 };
 
 struct Image
@@ -47,15 +50,10 @@ struct Image
     //~Image() { delete data; }
 };
 
-struct Material
-{
-    std::vector<Image> textures;
-};
-
 struct Model
 {
-    Material material;
-    Mesh mesh;
+    std::vector<Image> textures;
+    std::vector<Mesh> meshes;
 };
 
 #endif // TYPES_H

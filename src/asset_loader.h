@@ -12,6 +12,6 @@ public:
     static Image loadImage(const std::string &path);
 
 private:
-    static Mesh loadMesh(fastgltf::Expected<fastgltf::Asset> &asset);
+    static std::vector<Mesh> loadMeshes(fastgltf::Expected<fastgltf::Asset> &asset);
     static std::vector<Image> loadImage(fastgltf::Expected<fastgltf::Asset> &asset);
 };

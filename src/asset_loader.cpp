@@ -3,6 +3,7 @@
 #include "fastgltf/math.hpp"
 #include "fastgltf/tools.hpp"
 #include "stb_image.h"
+#include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 
 Model AssetLoader::loadModel(const std::string &path)
@@ -24,7 +25,7 @@ Model AssetLoader::loadModel(const std::string &path)
 
     std::cout << "model loaded successfully" << std::endl;
 
-    return {loadImage(asset), loadMesh(asset)};
+    return {loadImage(asset), loadMeshes(asset)};
 }
 
 Image AssetLoader::loadImage(const std::string &path)
@@ -41,57 +42,84 @@ Image AssetLoader::loadImage(const std::string &path)
             img};
 }
 
-Mesh AssetLoader::loadMesh(fastgltf::Expected<fastgltf::Asset> &asset)
+std::vector<Mesh> AssetLoader::loadMeshes(fastgltf::Expected<fastgltf::Asset> &asset)
 {
-    auto &mesh = asset->meshes[0];
+    std::vector<Mesh> meshes;
 
-    std::vector<vertex> vertices;
-    std::vector<uint32_t> indices;
+    const size_t sceneIndex = asset->defaultScene.value_or(0);
 
-    for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
-        auto positionIt = it->findAttribute("POSITION");
-        auto texcoordIt = it->findAttribute("TEXCOORD_0");
-        auto normalIt = it->findAttribute("NORMAL");
+    fastgltf::iterateSceneNodes(
+        asset.get(),
+        sceneIndex,
+        fastgltf::math::fmat4x4(),
+        [&](fastgltf::Node &node, fastgltf::math::fmat4x4 matrix) {
+            if (!node.meshIndex.has_value())
+                return;
 
-        auto &primitive = *it;
-        auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
+            auto &gltfMesh = asset->meshes[node.meshIndex.value()];
 
-        //vertices.resize(positionAccessor.count);
-        const size_t baseVertex = vertices.size();
-        vertices.resize(baseVertex + positionAccessor.count);
+            for (auto &primitive : gltfMesh.primitives) {
+                Mesh mesh;
+                mesh.worldTransform = glm::make_mat4(matrix.data());
 
-        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-            asset.get(), positionAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                vertices[baseVertex + idx].position = {pos.x(), pos.y(), pos.z()};
-                vertices[baseVertex + idx].uv = {};
-            });
+                // Positions
+                auto &positionAccessor
+                    = asset->accessors[primitive.findAttribute("POSITION")->accessorIndex];
+                mesh.vertices.resize(positionAccessor.count);
 
-        auto &texcoordAccessor = asset->accessors[texcoordIt->accessorIndex];
+                fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+                    asset.get(), positionAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+                        mesh.vertices[idx].position = {pos.x(), pos.y(), pos.z()};
+                    });
 
-        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset.get(),
-                                                                  texcoordAccessor,
-                                                                  [&](fastgltf::math::fvec2 uv,
-                                                                      std::size_t idx) {
-                                                                      vertices[idx].uv = {uv.x(),
-                                                                                          uv.y()};
-                                                                  });
+                // UVs
+            }
+        });
 
-        auto &normalAccessor = asset->accessors[normalIt->accessorIndex];
+    // for (auto it = mesh.primitives.begin(); it != mesh.primitives.end(); ++it) {
+    //     auto positionIt = it->findAttribute("POSITION");
+    //     auto texcoordIt = it->findAttribute("TEXCOORD_0");
+    //     auto normalIt = it->findAttribute("NORMAL");
 
-        fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
-            asset.get(), normalAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
-                vertices[baseVertex + idx].normal = {pos.x(), pos.y(), pos.z()};
-            });
+    //     auto &primitive = *it;
+    //     auto &positionAccessor = asset->accessors[positionIt->accessorIndex];
 
-        auto &indexAccessor = asset->accessors[it->indicesAccessor.value()];
-        const size_t firstIndex = indices.size();
-        indices.resize(firstIndex + indexAccessor.count);
+    //     //vertices.resize(positionAccessor.count);
+    //     const size_t baseVertex = vertices.size();
+    //     vertices.resize(baseVertex + positionAccessor.count);
 
-        fastgltf::copyFromAccessor<uint32_t>(asset.get(), indexAccessor, indices.data());
+    //     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+    //         asset.get(), positionAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+    //             vertices[baseVertex + idx].position = {pos.x(), pos.y(), pos.z()};
+    //             vertices[baseVertex + idx].uv = {};
+    //         });
 
-        for (size_t i = firstIndex; i < indices.size(); ++i)
-            indices[i] += static_cast<uint32_t>(baseVertex);
-    }
+    //     auto &texcoordAccessor = asset->accessors[texcoordIt->accessorIndex];
+
+    //     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset.get(),
+    //                                                               texcoordAccessor,
+    //                                                               [&](fastgltf::math::fvec2 uv,
+    //                                                                   std::size_t idx) {
+    //                                                                   vertices[idx].uv = {uv.x(),
+    //                                                                                       uv.y()};
+    //                                                               });
+
+    //     auto &normalAccessor = asset->accessors[normalIt->accessorIndex];
+
+    //     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
+    //         asset.get(), normalAccessor, [&](fastgltf::math::fvec3 pos, std::size_t idx) {
+    //             vertices[baseVertex + idx].normal = {pos.x(), pos.y(), pos.z()};
+    //         });
+
+    //     auto &indexAccessor = asset->accessors[it->indicesAccessor.value()];
+    //     const size_t firstIndex = indices.size();
+    //     indices.resize(firstIndex + indexAccessor.count);
+
+    //     fastgltf::copyFromAccessor<uint32_t>(asset.get(), indexAccessor, indices.data());
+
+    //     for (size_t i = firstIndex; i < indices.size(); ++i)
+    //         indices[i] += static_cast<uint32_t>(baseVertex);
+    // }
 
     return {vertices, indices};
 }
