@@ -83,7 +83,8 @@ public:
 
     Texture makeImage(TextureDescription desc, Image *image = nullptr);
 
-    NativeModel makeNativeModel(Model &model);
+    // A Model is a scene from blender, so can have many individual objects
+    std::vector<NativeModel> makeNativeModel(Model &model);
 
     VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bits);
 
@@ -109,6 +110,7 @@ public:
                          std::function<void(double time, double deltaTime)> updateFn);
 
     VkExtent2D getSwapchainSize() const;
+    uint32_t getSwapchainCount() const;
 
 private:
     uint32_t findMemoryType(VkPhysicalDevice phyDevice,
@@ -137,6 +139,7 @@ private:
 
     Window *m_window;
     VkExtent2D m_swapchainSize{0, 0};
+    uint32_t m_swapchainCount;
 };
 
 #endif // GRAPHICS_H

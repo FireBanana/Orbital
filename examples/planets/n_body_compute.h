@@ -18,8 +18,8 @@ private:
     void generateData();
 
     std::vector<glm::vec4> m_bodies;
-    std::array<Buffer, Global::SWAPCHAIN_SIZE> m_dataBuffer;
-    std::array<Buffer, Global::SWAPCHAIN_SIZE> m_readBuffer;
+    std::vector<Buffer> m_dataBuffer; //One for each swapchain image
+    std::vector<Buffer> m_readBuffer; //One for each swapchain image
 };
 
 #endif // N_BODY_COMPUTE_H

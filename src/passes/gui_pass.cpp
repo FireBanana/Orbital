@@ -20,7 +20,7 @@ GuiPass::GuiPass(Graphics *graphics)
     init_info.Queue = Global::g_queue;
     init_info.DescriptorPoolSize = 8;
     init_info.MinImageCount = 2;
-    init_info.ImageCount = Global::SWAPCHAIN_SIZE;
+    init_info.ImageCount = graphics->getSwapchainCount();
     init_info.UseDynamicRendering = true;
     init_info.ApiVersion = VK_API_VERSION_1_4;
     init_info.PipelineInfoMain.PipelineRenderingCreateInfo = {

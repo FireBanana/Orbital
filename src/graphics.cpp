@@ -444,7 +444,7 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
 void Graphics::makeRenderTarget(bool isRecreate)
 {
     if (isRecreate) {
-        for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
+        for (auto i = 0; i < m_swapchainCount; ++i) {
             vkDestroyImage(Global::g_device, Global::g_render_targets[i].image, nullptr);
             vkDestroyImageView(Global::g_device, Global::g_render_targets[i].view, nullptr);
             vkFreeMemory(Global::g_device, Global::g_render_targets[i].memory, nullptr);
@@ -455,7 +455,7 @@ void Graphics::makeRenderTarget(bool isRecreate)
         std::cout << "Error, swapchain images being created without swapchain recreation!";
     }
 
-    for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
+    for (auto i = 0; i < m_swapchainCount; ++i) {
         auto target = makeImage({m_swapchainSize.width,
                                  m_swapchainSize.height,
                                  Global::RENDER_TARGET_FORMAT,
@@ -491,13 +491,14 @@ void Graphics::makeSwapchain()
         m_swapchainSize.height = surfaceProperties.currentExtent.height;
     }
 
-    makeRenderTarget(isRecreate);
+    m_swapchainCount = surfaceProperties.minImageCount;
+    Global::g_frame_data.resize(m_swapchainCount);
 
-    uint32_t desiredImages = Global::SWAPCHAIN_SIZE; //Assuming more than min
+    makeRenderTarget(isRecreate);
 
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     info.surface = Global::g_surface;
-    info.minImageCount = desiredImages;
+    info.minImageCount = m_swapchainCount;
     info.imageFormat = Global::FORMAT; //Assuming we have this
     info.imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
     info.imageExtent = m_swapchainSize;
@@ -846,25 +847,33 @@ VkResult Graphics::acquireSwapchainImage(uint32_t *img)
     return res;
 }
 
-NativeModel Graphics::makeNativeModel(Model &model)
+std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
 {
-    auto vbuffer = makeBuffer({sizeof(vertex) * model.mesh.vertices.size(),
-                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-                              model.mesh.vertices.data());
-    auto ibuffer = makeBuffer({sizeof(uint32_t) * model.mesh.indices.size(),
-                               VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                               VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
-                              model.mesh.indices.data());
+    std::vector<NativeModel> result;
 
-    auto modelTex = makeImage({model.material.textures[0].width,
-                                 model.material.textures[0].height,
-                                 VK_FORMAT_R8G8B8A8_SRGB,
-                                 VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                 VK_IMAGE_ASPECT_COLOR_BIT},
-                                &model.material.textures[0]);
+    for (auto &m : model.meshes) {
+        auto vbuffer = makeBuffer({sizeof(vertex) * m.vertices.size(),
+                                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+                                       | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                                  m.vertices.data());
+        auto ibuffer = makeBuffer({sizeof(uint32_t) * m.indices.size(),
+                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+                                       | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
+                                  m.indices.data());
 
-    return {vbuffer, ibuffer, modelTex, static_cast<uint32_t>(model.mesh.indices.size())};
+        auto modelTex = makeImage({model.textures[m.textureIndex].width,
+                                   model.textures[m.textureIndex].height,
+                                   VK_FORMAT_R8G8B8A8_SRGB,
+                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                   VK_IMAGE_ASPECT_COLOR_BIT},
+                                  &model.textures[m.textureIndex]);
+
+        result.push_back({vbuffer, ibuffer, modelTex, static_cast<uint32_t>(m.indices.size())});
+    }
+
+    return result;
 }
 
 void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
@@ -933,4 +942,9 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
 VkExtent2D Graphics::getSwapchainSize() const
 {
     return m_swapchainSize;
+}
+
+uint32_t Graphics::getSwapchainCount() const
+{
+    return m_swapchainCount;
 }

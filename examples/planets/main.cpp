@@ -83,9 +83,9 @@ int main()
 
     for (int i = 0; i < 50; ++i) {
         if (i % 2 == 0)
-            renderables[i] = earth;
+            renderables[i] = earth[i % earth.size()];
         else
-            renderables[i] = monkey;
+            renderables[i] = monkey[i % monkey.size()];
     }
 
     fPass.attachModels(&renderables);

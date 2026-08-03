@@ -5,6 +5,9 @@
 GravityComputePass::GravityComputePass(Graphics *graphics)
     : Pass(graphics)
 {
+    m_dataBuffer.resize(graphics->getSwapchainCount());
+    m_readBuffer.resize(graphics->getSwapchainCount());
+
     createDescriptor();
     createPipeline();
     generateData();
@@ -140,7 +143,7 @@ void GravityComputePass::generateData()
         glm::vec4(4.503e12f, 0.0f, 0.0f, 1.024e26f)  // Neptune
     };
 
-    for (auto i = 0; i < Global::SWAPCHAIN_SIZE; ++i) {
+    for (auto i = 0; i < m_graphics->getSwapchainCount(); ++i) {
         m_dataBuffer[i] = m_graphics->makeBuffer({m_bodies.size() * sizeof(glm::vec4),
                                       VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
                                           | VK_BUFFER_USAGE_TRANSFER_DST_BIT

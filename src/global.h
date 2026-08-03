@@ -12,7 +12,6 @@ constexpr uint32_t QUEUE_INDEX = 0;
 constexpr VkFormat FORMAT = VK_FORMAT_B8G8R8A8_UNORM;
 constexpr VkFormat RENDER_TARGET_FORMAT = VK_FORMAT_R8G8B8A8_UNORM;
 constexpr VkFormat DEPTH_FORMAT = VK_FORMAT_D32_SFLOAT;
-constexpr uint32_t SWAPCHAIN_SIZE = 3;
 //constexpr uint32_t FRAMES_IN_FLIGHT = 2;
 
 inline uint32_t g_width = 960;
@@ -34,7 +33,7 @@ inline std::vector<VkImageView> g_swapchain_views;
 
 // Per frame data
 inline std::vector<VkSemaphore> g_semaphores;
-inline std::array<Frame, SWAPCHAIN_SIZE> g_frame_data{};
+inline std::vector<Frame> g_frame_data{};
 
 inline std::thread g_gui_thread;
 inline std::atomic<bool> g_window_running = true;
