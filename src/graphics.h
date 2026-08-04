@@ -72,6 +72,7 @@ struct NativeModel
     Texture texture;
     uint32_t indexCount;
     vec3 position = {0, 0, 0};
+    glm::mat4 worldTransform = glm::mat4(1.0);
 };
 
 class Graphics

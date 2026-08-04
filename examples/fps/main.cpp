@@ -15,7 +15,7 @@ int main()
     std::vector<NativeModel> models{nmap};
 
     passes[0]->attachModels(&models);
-    static_cast<ForwardPass *>(passes[0])->setCameraPosition({2, 1, 2});
+    static_cast<ForwardPass *>(passes[0])->setCameraPosition({30, 10, 30});
 
     g.beginRenderLoop(passes, cPasses, [](double, double) {});
 }

@@ -99,7 +99,7 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                                               1000.0f);
 
             m_view = glm::lookAt(m_cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-            m_constants = {glm::translate(glm::mat4(1.0f),
+            m_constants = {glm::translate(model.worldTransform,
                                           glm::vec3(model.position.x,
                                                     model.position.y,
                                                     model.position.z)),

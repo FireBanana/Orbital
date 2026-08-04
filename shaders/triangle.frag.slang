@@ -15,7 +15,7 @@ struct VSOutput
     float2 Uv : TEXCOORD0;
 };
 
-static float3 g_light_dir = {-0.8, -1.0, 3.0};
+static float3 g_light_dir = {-0.8, 1.0, 3.0};
 
 [[vk::push_constant]]
 UniformConstants state;
@@ -38,7 +38,7 @@ float schlick(float3 normal, float3 pos)
 float4 main(VSOutput input)
 {
     float3 light = max(dot(normalize(g_light_dir), normalize(input.Normal)), float3(0.));
-    float ambient = 300.;
+    float ambient = 100.;
 
     float4 color = diffuse_texture.Sample(input.Uv);
     color = pow(color, 1/2.2);

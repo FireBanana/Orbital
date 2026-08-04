@@ -863,14 +863,20 @@ std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
                                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT},
                                   m.indices.data());
 
-        auto modelTex = makeImage({model.textures[m.textureIndex].width,
-                                   model.textures[m.textureIndex].height,
-                                   VK_FORMAT_R8G8B8A8_SRGB,
-                                   VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                   VK_IMAGE_ASPECT_COLOR_BIT},
-                                  &model.textures[m.textureIndex]);
+        Texture modelTex{};
 
-        result.push_back({vbuffer, ibuffer, modelTex, static_cast<uint32_t>(m.indices.size())});
+        if (m.textureIndex != -1) {
+            modelTex = makeImage({model.textures[m.textureIndex].width,
+                                  model.textures[m.textureIndex].height,
+                                  VK_FORMAT_R8G8B8A8_SRGB,
+                                  VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                  VK_IMAGE_ASPECT_COLOR_BIT},
+                                 &model.textures[m.textureIndex]);
+        }
+
+        NativeModel nm{vbuffer, ibuffer, modelTex, static_cast<uint32_t>(m.indices.size())};
+        nm.worldTransform = m.worldTransform;
+        result.push_back(std::move(nm));
     }
 
     return result;
