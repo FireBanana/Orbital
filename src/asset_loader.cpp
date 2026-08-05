@@ -73,8 +73,12 @@ std::tuple<std::vector<Mesh>, std::vector<Image>> AssetLoader::internalLoadModel
                 if (primitive.materialIndex.has_value()) {
                     auto &mat = asset->materials[*primitive.materialIndex];
 
-                    auto setTexture = [&mat, &asset, &textureCache, &mesh, &images](fastgltf::Optional<fastgltf::TextureInfo> &textureInfo, TextureType tType) {
-                        if (mat.pbrData.baseColorTexture.has_value()) {
+                    auto setTexture = [&mat,
+                                       &asset,
+                                       &textureCache,
+                                       &mesh,
+                                       &images](const auto &textureInfo, TextureType tType) {
+                        if (textureInfo.has_value()) {
                             auto &tex = asset->textures[textureInfo->textureIndex];
 
                             if (tex.imageIndex.has_value()) {
@@ -87,7 +91,7 @@ std::tuple<std::vector<Mesh>, std::vector<Image>> AssetLoader::internalLoadModel
                                     images.push_back(
                                         loadModelImage(asset, asset->images[*tex.imageIndex]));
                                     mesh.textureIds[tType] = static_cast<int8_t>(images.size() - 1);
-                                    // textureCache.emplace(resourceImage, mesh.textureIds[mesh.textureIds.size() - 1]);
+                                    textureCache.insert(resourceImage);
                                 }
                             }
                         }
@@ -97,8 +101,7 @@ std::tuple<std::vector<Mesh>, std::vector<Image>> AssetLoader::internalLoadModel
                     setTexture(mat.pbrData.baseColorTexture, TextureType::Diffuse);
 
                     // Normal
-                    auto normalInfo = fastgltf::Optional<fastgltf::TextureInfo>(std::move(*mat.normalTexture));
-                    setTexture(normalInfo, TextureType::Normal);
+                    setTexture(mat.normalTexture, TextureType::Normal);
                 }
 
                 // Positions

@@ -9,7 +9,7 @@ int main()
     std::vector<Pass *> passes{new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
-    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/helmet.glb");
+    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/testscene.glb");
     auto nmap = g.makeNativeModel(map);
 
     std::vector<NativeModel> models{nmap};

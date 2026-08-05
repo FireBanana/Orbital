@@ -871,7 +871,10 @@ std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
             }
         }
 
-        NativeModel nm{vbuffer, ibuffer, modelTex, static_cast<uint32_t>(m.indices.size())};
+        NativeModel nm{vbuffer,
+                       ibuffer,
+                       std::move(modelTex),
+                       static_cast<uint32_t>(m.indices.size())};
         nm.worldTransform = m.worldTransform;
         result.push_back(std::move(nm));
     }
