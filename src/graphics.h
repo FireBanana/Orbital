@@ -69,7 +69,7 @@ struct NativeModel
 {
     Buffer vertex;
     Buffer index;
-    Texture texture;
+    std::unordered_map<TextureType, Texture> textures;
     uint32_t indexCount;
     vec3 position = {0, 0, 0};
     glm::mat4 worldTransform = glm::mat4(1.0);

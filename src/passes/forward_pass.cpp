@@ -122,7 +122,7 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
             VkDescriptorImageInfo imageInfo{};
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = model.texture.view;
+            imageInfo.imageView = model.textures[TextureType::Diffuse].view;
             imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
             VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};

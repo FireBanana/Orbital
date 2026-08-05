@@ -8,7 +8,7 @@
 class AssetLoader
 {
 public:
-    static Model loadModel(const std::string &path);
+    static Model loadScene(const std::string &path);
     static Image loadImage(const std::string &path);
 
 private:

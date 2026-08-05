@@ -3,6 +3,8 @@
 
 #include <cstdint>
 #include <glm/ext/matrix_float4x4.hpp>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 struct vec3
@@ -32,11 +34,18 @@ struct vertex
     vec2 uv;
 };
 
+enum class TextureType : int8_t {
+    None = -1,
+    Diffuse = 0,
+    Normal = 1,
+    Count = 2 // This is used as the total count
+};
+
 struct Mesh
 {
     std::vector<vertex> vertices;
     std::vector<uint32_t> indices;
-    int8_t textureIndex = -1;
+    std::unordered_map<TextureType, int8_t> textureIds;
     glm::mat4 worldTransform{1.0f};
 };
 
