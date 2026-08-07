@@ -45,7 +45,7 @@ struct Mesh
 {
     std::vector<vertex> vertices;
     std::vector<uint32_t> indices;
-    std::unordered_map<TextureType, int8_t> textureIds;
+    std::unordered_map<TextureType, int32_t> textureIds;
     glm::mat4 worldTransform{1.0f};
 };
 

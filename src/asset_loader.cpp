@@ -54,7 +54,7 @@ std::tuple<std::vector<Mesh>, std::vector<Image>> AssetLoader::internalLoadModel
     std::vector<Image> images;
 
     const size_t sceneIndex = asset->defaultScene.value_or(0);
-    std::unordered_set<size_t> textureCache;
+    std::unordered_map<size_t, int32_t> textureCache;
 
     fastgltf::iterateSceneNodes(
         asset.get(),
@@ -86,12 +86,13 @@ std::tuple<std::vector<Mesh>, std::vector<Image>> AssetLoader::internalLoadModel
 
                                 if (auto it = textureCache.find(resourceImage);
                                     it != textureCache.end()) {
-                                    mesh.textureIds[tType] = static_cast<int8_t>(*it);
+                                    mesh.textureIds[tType] = it->second;
                                 } else {
                                     images.push_back(
                                         loadModelImage(asset, asset->images[*tex.imageIndex]));
-                                    mesh.textureIds[tType] = static_cast<int8_t>(images.size() - 1);
-                                    textureCache.insert(resourceImage);
+                                    mesh.textureIds[tType] = static_cast<int32_t>(images.size() - 1);
+                                    textureCache.emplace(resourceImage,
+                                                         static_cast<int32_t>(images.size() - 1));
                                 }
                             }
                         }

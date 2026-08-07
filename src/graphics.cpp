@@ -1,12 +1,16 @@
+#define VMA_IMPLEMENTATION
+// To dynamically load vulkan functions in Vma - change if using volk
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
 #include "global.h"
 #include "graphics.h"
 #include "passes/pass.h"
 #include "window.h"
-#include <array>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <vk_mem_alloc.h>
 
 // TODO: Move compute stuff to a compute queue https://github.com/KhronosGroup/Vulkan-Samples/blob/main/samples/performance/async_compute/README.adoc
 
@@ -94,8 +98,14 @@ void Graphics::makeDevice()
     vkEnumeratePhysicalDevices(Global::g_instance, &gpuCount, devices.data());
 
     std::cout << "Found " << gpuCount << " gpus" << std::endl;
+    int selectedDevice = 1;
 
-    Global::g_physical_device = devices[0];
+    Global::g_physical_device = devices[selectedDevice];
+
+    VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+    vkGetPhysicalDeviceProperties2(Global::g_physical_device, &properties);
+
+    std::cout << "Selecting GPU: " << properties.properties.deviceName << std::endl;
 
     // Assume everythings supported
     // Assume we pick queue 0
@@ -135,7 +145,8 @@ void Graphics::makeDevice()
     deviceInfo.ppEnabledExtensionNames = extensions;
     deviceInfo.enabledExtensionCount = 1;
 
-    if (vkCreateDevice(devices[0], &deviceInfo, nullptr, &Global::g_device) == VK_SUCCESS)
+    if (vkCreateDevice(devices[selectedDevice], &deviceInfo, nullptr, &Global::g_device)
+        == VK_SUCCESS)
         std::cout << "Created device" << std::endl;
     else
         std::cout << "Creating device failed" << std::endl;
@@ -149,6 +160,7 @@ Graphics::Graphics(Window *window)
     makeInstance();
     makeDevice();
     window->makeSurface();
+    makeAllocator();
     makeSwapchain();
 }
 
@@ -161,7 +173,16 @@ Buffer Graphics::makeBuffer(BufferDescription desc, void *data)
     vertexBInfo.usage = desc.usage;
     vertexBInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(Global::g_device, &vertexBInfo, nullptr, &result.buffer) == VK_SUCCESS)
+    VmaAllocationCreateInfo vmaInfo{};
+    vmaInfo.usage = VMA_MEMORY_USAGE_AUTO;
+    vmaInfo.requiredFlags = desc.memProperty;
+    vmaInfo.flags = (data != nullptr && (desc.memProperty & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT))
+                        ? 0
+                        : VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+
+    if (vmaCreateBuffer(
+            Global::g_allocator, &vertexBInfo, &vmaInfo, &result.buffer, &result.memory, nullptr)
+        == VK_SUCCESS)
         std::cout << "Made triangle buffer" << std::endl;
     else
         std::cout << "Triangle buffer failed" << std::endl;
@@ -170,18 +191,18 @@ Buffer Graphics::makeBuffer(BufferDescription desc, void *data)
     vkGetBufferMemoryRequirements(Global::g_device, result.buffer, &memReq);
 
     //Assume memory index 0
-    VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    allocInfo.allocationSize = memReq.size;
-    allocInfo.memoryTypeIndex = findMemoryType(
-        Global::g_physical_device, // Add cached bit option
-        memReq.memoryTypeBits,
-        desc.memProperty);
-    if (vkAllocateMemory(Global::g_device, &allocInfo, nullptr, &result.memory) == VK_SUCCESS)
-        std::cout << "Allocated triangle memory" << std::endl;
-    else
-        std::cout << "Triangle memory failed" << std::endl;
+    // VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    // allocInfo.allocationSize = memReq.size;
+    // allocInfo.memoryTypeIndex = findMemoryType(
+    //     Global::g_physical_device, // Add cached bit option
+    //     memReq.memoryTypeBits,
+    //     desc.memProperty);
+    // if (vkAllocateMemory(Global::g_device, &allocInfo, nullptr, &result.memory) == VK_SUCCESS)
+    //     std::cout << "Allocated triangle memory" << std::endl;
+    // else
+    //     std::cout << "Triangle memory failed" << std::endl;
 
-    vkBindBufferMemory(Global::g_device, result.buffer, result.memory, 0);
+    // vkBindBufferMemory(Global::g_device, result.buffer, result.memory, 0);
 
     // Should also handle cases where its both host and local, or at least output error
     if (data != nullptr && desc.memProperty & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
@@ -245,16 +266,23 @@ Buffer Graphics::makeBuffer(BufferDescription desc, void *data)
         vkQueueSubmit(Global::g_queue, 1, &submitInfo, stagingFence);
 
         vkWaitForFences(Global::g_device, 1, &stagingFence, VK_TRUE, UINT64_MAX);
+
+        vmaDestroyBuffer(Global::g_allocator, buffer.buffer, buffer.memory);
+        vkDestroyCommandPool(Global::g_device, pool, nullptr);
+        vkDestroyFence(Global::g_device, stagingFence, nullptr);
     } else if (
         data == nullptr
         && desc.memProperty
                & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-        vkMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
+        //vMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
+        vmaMapMemory(Global::g_allocator, result.memory, &result.mappedData);
         // Needs to be unmapped at some point?
     } else if (data != nullptr) {
-        vkMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
+        //vkMapMemory(Global::g_device, result.memory, 0, desc.bufferSize, 0, &result.mappedData);
+        vmaMapMemory(Global::g_allocator, result.memory, &result.mappedData);
         memcpy(result.mappedData, data, (size_t) desc.bufferSize);
-        vkUnmapMemory(Global::g_device, result.memory);
+        //vkUnmapMemory(Global::g_device, result.memory);
+        vmaUnmapMemory(Global::g_allocator, result.memory);
     }
 
     return result;
@@ -309,18 +337,22 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
 
-    vkCreateImage(Global::g_device, &info, nullptr, &result.image);
+    VmaAllocationCreateInfo vmaInfo{};
+    vmaInfo.usage = VMA_MEMORY_USAGE_AUTO;
 
-    VkMemoryRequirements memReqs{};
-    vkGetImageMemoryRequirements(Global::g_device, result.image, &memReqs);
+    //vkCreateImage(Global::g_device, &info, nullptr, &result.image);
+    vmaCreateImage(Global::g_allocator, &info, &vmaInfo, &result.image, &result.memory, nullptr);
 
-    VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    allocInfo.allocationSize = memReqs.size;
-    allocInfo.memoryTypeIndex = findMemoryType(
-        Global::g_physical_device, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    // VkMemoryRequirements memReqs{};
+    // vkGetImageMemoryRequirements(Global::g_device, result.image, &memReqs);
 
-    vkAllocateMemory(Global::g_device, &allocInfo, nullptr, &result.memory);
-    vkBindImageMemory(Global::g_device, result.image, result.memory, 0);
+    // VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    // allocInfo.allocationSize = memReqs.size;
+    // allocInfo.memoryTypeIndex = findMemoryType(
+    //     Global::g_physical_device, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    // vkAllocateMemory(Global::g_device, &allocInfo, nullptr, &result.memory);
+    // vkBindImageMemory(Global::g_device, result.image, result.memory, 0);
 
     VkImageViewCreateInfo createInfo{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
     createInfo.image = result.image;
@@ -414,9 +446,9 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
         vkEndCommandBuffer(cmd);
 
         //submit
-        VkSemaphore stagingSemaphore;
-        VkSemaphoreCreateInfo semInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        vkCreateSemaphore(Global::g_device, &semInfo, nullptr, &stagingSemaphore);
+        // VkSemaphore stagingSemaphore;
+        // VkSemaphoreCreateInfo semInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        // vkCreateSemaphore(Global::g_device, &semInfo, nullptr, &stagingSemaphore);
 
         VkFence stagingFence;
         VkFenceCreateInfo fenceInfo{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -425,12 +457,16 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
         VkSubmitInfo submitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &cmd;
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &stagingSemaphore;
+        submitInfo.signalSemaphoreCount = 0;
+        // submitInfo.pSignalSemaphores = &stagingSemaphore;
 
         vkQueueSubmit(Global::g_queue, 1, &submitInfo, stagingFence);
 
         vkWaitForFences(Global::g_device, 1, &stagingFence, VK_TRUE, UINT64_MAX);
+
+        vmaDestroyBuffer(Global::g_allocator, buffer.buffer, buffer.memory);
+        vkDestroyCommandPool(Global::g_device, pool, nullptr);
+        vkDestroyFence(Global::g_device, stagingFence, nullptr);
     }
 
     result.isValid = true;
@@ -444,7 +480,8 @@ void Graphics::makeRenderTarget(bool isRecreate)
         for (auto i = 0; i < m_swapchainCount; ++i) {
             vkDestroyImage(Global::g_device, Global::g_render_targets[i].image, nullptr);
             vkDestroyImageView(Global::g_device, Global::g_render_targets[i].view, nullptr);
-            vkFreeMemory(Global::g_device, Global::g_render_targets[i].memory, nullptr);
+            //vkFreeMemory(Global::g_device, Global::g_render_targets[i].memory, nullptr);
+            vmaFreeMemory(Global::g_allocator, Global::g_render_targets[i].memory);
         }
 
         Global::g_render_targets.clear();
@@ -463,6 +500,21 @@ void Graphics::makeRenderTarget(bool isRecreate)
 
         Global::g_render_targets.push_back(std::move(target));
     }
+}
+
+void Graphics::makeAllocator()
+{
+    VmaVulkanFunctions vulkanFunctions{};
+    vulkanFunctions.vkGetInstanceProcAddr = &vkGetInstanceProcAddr;
+    vulkanFunctions.vkGetDeviceProcAddr = &vkGetDeviceProcAddr;
+
+    VmaAllocatorCreateInfo info{};
+    info.instance = Global::g_instance;
+    info.physicalDevice = Global::g_physical_device;
+    info.device = Global::g_device;
+    info.pVulkanFunctions = &vulkanFunctions;
+
+    vmaCreateAllocator(&info, &Global::g_allocator);
 }
 
 void Graphics::makeSwapchain()
@@ -561,7 +613,8 @@ void Graphics::recreateSwapchain(std::vector<Pass *> &graphicPasses)
         if (p->m_depth != nullptr) {
             vkDestroyImageView(Global::g_device, p->m_depth->view, nullptr);
             vkDestroyImage(Global::g_device, p->m_depth->image, nullptr);
-            vkFreeMemory(Global::g_device, p->m_depth->memory, nullptr);
+            //vkFreeMemory(Global::g_device, p->m_depth->memory, nullptr);
+            vmaFreeMemory(Global::g_allocator, p->m_depth->memory);
 
             auto newDesc = p->m_depth->description;
             newDesc.width = m_swapchainSize.width;
@@ -844,6 +897,7 @@ VkResult Graphics::acquireSwapchainImage(uint32_t *img)
 std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
 {
     std::vector<NativeModel> result;
+    std::unordered_map<int32_t, Texture> textureCache{};
 
     for (auto &m : model.meshes) {
         auto vbuffer = makeBuffer(
@@ -860,21 +914,26 @@ std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
         std::unordered_map<TextureType, Texture> modelTex{};
 
         for (auto [texType, texId] : m.textureIds) {
+            if (auto it = textureCache.find(texId); it != textureCache.end()) {
+                modelTex[texType] = it->second;
+                continue;
+            }
+
             if (texType != TextureType::None) {
-                modelTex[texType] = makeImage({model.textures[texId].width,
-                                               model.textures[texId].height,
-                                               VK_FORMAT_R8G8B8A8_SRGB,
-                                               VK_IMAGE_USAGE_SAMPLED_BIT
-                                                   | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                               VK_IMAGE_ASPECT_COLOR_BIT},
-                                              &model.textures[texId]);
+                modelTex[texType] = makeImage(
+                    {model.textures[texId].width,
+                     model.textures[texId].height,
+                     VK_FORMAT_R8G8B8A8_SRGB,
+                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                     VK_IMAGE_ASPECT_COLOR_BIT},
+                    &model.textures[texId]);
+
+                textureCache.insert({texId, modelTex[texType]});
             }
         }
 
-        NativeModel nm{vbuffer,
-                       ibuffer,
-                       std::move(modelTex),
-                       static_cast<uint32_t>(m.indices.size())};
+        NativeModel
+            nm{vbuffer, ibuffer, std::move(modelTex), static_cast<uint32_t>(m.indices.size())};
         nm.worldTransform = m.worldTransform;
         result.push_back(std::move(nm));
     }

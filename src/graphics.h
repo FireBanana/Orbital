@@ -10,6 +10,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
+#include <vk_mem_alloc.h>
 #include <vulkan/vulkan_core.h>
 
 class Pass;
@@ -48,7 +49,8 @@ struct BufferDescription
 
 struct Buffer
 {
-    VkDeviceMemory memory;
+    //VkDeviceMemory memory;
+    VmaAllocation memory;
     VkBuffer buffer;
     void *mappedData;
 };
@@ -56,7 +58,8 @@ struct Buffer
 struct Texture
 {
     bool isValid;
-    VkDeviceMemory memory;
+    //VkDeviceMemory memory;
+    VmaAllocation memory;
     VkImage image;
     VkImageView view;
     VkSampler sampler;
@@ -127,6 +130,8 @@ private:
     void recreateSwapchain(std::vector<Pass *> &graphicPasses);
 
     void makeRenderTarget(bool isRecreate);
+
+    void makeAllocator();
 
     void initPerFrame(int index);
 

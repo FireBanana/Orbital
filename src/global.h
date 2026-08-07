@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <thread>
+#include <vk_mem_alloc.h>
 
 // C++17 inline variables
 namespace Global {
@@ -22,6 +23,7 @@ inline GLFWwindow *g_window;
 inline VkInstance g_instance;
 inline VkPhysicalDevice g_physical_device;
 inline VkDevice g_device;
+inline VmaAllocator g_allocator;
 inline VkQueue g_queue;
 inline VkSurfaceKHR g_surface;
 inline VkSwapchainKHR g_swapchain = VK_NULL_HANDLE;

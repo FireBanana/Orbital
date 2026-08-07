@@ -14,6 +14,13 @@ find_package(glm REQUIRED)
 # ===================RETRIEVE LIBRARIES==================
 
 FetchContent_Declare(
+    vma
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(vma)
+
+FetchContent_Declare(
     fastgltf
     GIT_REPOSITORY https://github.com/spnda/fastgltf.git
     GIT_TAG main
@@ -72,7 +79,7 @@ target_include_directories(imgui PUBLIC
     ${imgui_SOURCE_DIR}/backends
 )
 
-target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw)
+target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw GPUOpen::VulkanMemoryAllocator)
 
 # =====================SHADER COMPILATION=================
 
