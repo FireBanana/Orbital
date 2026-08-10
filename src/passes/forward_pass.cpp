@@ -120,23 +120,36 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
             vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
             vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
 
-            VkDescriptorImageInfo imageInfo{};
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = model.textures[TextureType::Diffuse].view;
-            imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+            VkDescriptorImageInfo diffuseImageInfo{};
+            diffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            diffuseImageInfo.imageView = model.textures[TextureType::Diffuse].view;
+            diffuseImageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
 
-            VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-            writeSet.dstBinding = 0;
-            writeSet.descriptorCount = 1;
-            writeSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            writeSet.pImageInfo = &imageInfo;
+            VkDescriptorImageInfo normalImageInfo{};
+            normalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            normalImageInfo.imageView = model.textures[TextureType::Normal].view;
+            normalImageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+
+            VkWriteDescriptorSet diffuseWriteSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            diffuseWriteSet.dstBinding = 0;
+            diffuseWriteSet.descriptorCount = 1;
+            diffuseWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            diffuseWriteSet.pImageInfo = &diffuseImageInfo;
+
+            VkWriteDescriptorSet normalWriteSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            normalWriteSet.dstBinding = 1;
+            normalWriteSet.descriptorCount = 1;
+            normalWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            normalWriteSet.pImageInfo = &normalImageInfo;
+
+            std::array<VkWriteDescriptorSet, 2> sets{diffuseWriteSet, normalWriteSet};
 
             vkCmdPushDescriptorSet(*cmd,
                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
                                    m_pipelineLayout,
                                    0,
-                                   1,
-                                   &writeSet);
+                                   2,
+                                   sets.data());
 
             vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
         }
@@ -279,23 +292,34 @@ void ForwardPass::createPipeline()
 void ForwardPass::createSampler()
 {
     VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+    info.magFilter = VK_FILTER_LINEAR;
+    info.minFilter = VK_FILTER_LINEAR;
     vkCreateSampler(Global::g_device, &info, nullptr, &m_sampler);
 }
 
 void ForwardPass::createDescriptor()
 {
-    VkDescriptorSetLayoutBinding binding{};
-    binding.binding = 0;
-    binding.descriptorCount = 1;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    binding.pImmutableSamplers = &m_sampler;
+    VkDescriptorSetLayoutBinding diffuseBinding{};
+    diffuseBinding.binding = 0;
+    diffuseBinding.descriptorCount = 1;
+    diffuseBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    diffuseBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    diffuseBinding.pImmutableSamplers = &m_sampler;
+
+    VkDescriptorSetLayoutBinding normalBinding{};
+    normalBinding.binding = 1;
+    normalBinding.descriptorCount = 1;
+    normalBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    normalBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    normalBinding.pImmutableSamplers = &m_sampler;
+
+    std::array<VkDescriptorSetLayoutBinding, 2> bindings{diffuseBinding, normalBinding};
 
     VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
     info.flags
         = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-    info.bindingCount = 1;
-    info.pBindings = &binding;
+    info.bindingCount = 2;
+    info.pBindings = bindings.data();
 
     vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &m_descriptorSetLayout);
 }

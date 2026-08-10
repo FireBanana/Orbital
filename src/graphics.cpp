@@ -98,7 +98,7 @@ void Graphics::makeDevice()
     vkEnumeratePhysicalDevices(Global::g_instance, &gpuCount, devices.data());
 
     std::cout << "Found " << gpuCount << " gpus" << std::endl;
-    int selectedDevice = 1;
+    int selectedDevice = 0;
 
     Global::g_physical_device = devices[selectedDevice];
 

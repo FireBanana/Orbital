@@ -23,6 +23,9 @@ UniformConstants state;
 [[vk::binding(0, 0)]]
 Sampler2D diffuse_texture;
 
+[[vk::binding(1, 0)]]
+Sampler2D normal_texture;
+
 float schlick(float3 normal, float3 pos)
 {
     float ior_air = 1.0003;
@@ -34,6 +37,11 @@ float schlick(float3 normal, float3 pos)
     return pow(r0 + (1. - r0)*(1. - cos(a)), 5.0);
 }
 
+void evalSpecCookTorrence(float3 normal, float3, viewDir, float3 lightDir)
+{
+    var halfVec = normalize(viewDir + lightDir);
+}
+
 [shader("fragment")]
 float4 main(VSOutput input)
 {
@@ -42,5 +50,5 @@ float4 main(VSOutput input)
 
     float4 color = diffuse_texture.Sample(input.Uv);
     color = pow(color, 1/2.2);
-    return float4(color.rgb * light + ambient * schlick(input.Normal, input.WorldPos.xyz), 1.0);
+    return color;//float4(color.rgb * light + ambient * schlick(input.Normal, input.WorldPos.xyz), 1.0);
 }
