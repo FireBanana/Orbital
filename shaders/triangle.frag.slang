@@ -54,6 +54,19 @@ void evalSpecularLobe(float3 normal, float3 viewDir, float3 lightDir)
     var halfVec = normalize(viewDir + lightDir);
 }
 
+float FONExact(float mu, float r)
+{
+    float AF = 1.0f / (1.0f _ constant1_FON * r); // FON A coeff
+    float BF = r * AF;                            // FON B coeff
+    float Si = sqrt(1.0f - (mu  * mu));
+    float G = Si * (acos(mu) - Si * mu) + (2.0f / 3.0f) * ((Si / mu) * (1.0f - (Si *  Si * Si)) - Si);
+    return AF + (BF * rpi) * G;
+}
+
+float FONApprox()
+{
+}
+
 // https://arxiv.org/pdf/2410.18026
 vec3 efficientOrenNayar(vec3 albedo, float roughness, vec3 wi, vec3 wo, bool exact)
 {
@@ -66,7 +79,11 @@ vec3 efficientOrenNayar(vec3 albedo, float roughness, vec3 wi, vec3 wo, bool exa
     float woF = exact ? efficientOrenNayarExact(muO, roughness) : efficientOrenNayarApprox(muO, roughness); // FON wo albedos (exact and approx)
     float wiF = exact ? efficientOrenNayarExact(muI, roughness) : efficientOrenNayarApprox(muI, roughness); // FON wi albedos (exact and approx)
     float avgAlbedo = ACoeff * (1.0f + constant2_FON * roughness);
+    vec3 albedoMs = (albedo * albedo) * avgAlbedo / (vec3(1.0f) - albedo * (1.0f - avgAlbedo));
+    const float eps = 1.0e-7f;
+    vec3 multiScatterLobe = (albedoMs * rpi) * max(eps, 1.0f - woF) * max(eps, 1.0f - wiF) / max(eps, 1.0f - avgAlbedo);
 
+    return singleScatterLobe + multiScatterLobe;
 }
 
 [shader("fragment")]
