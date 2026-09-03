@@ -38,7 +38,8 @@ enum class TextureType : int8_t {
     None = -1,
     Diffuse = 0,
     Normal = 1,
-    Count = 2 // This is used as the total count
+    MetallicRoughness = 2,
+    Count = 3 // This is used as the total count
 };
 
 struct Mesh

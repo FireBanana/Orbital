@@ -26,6 +26,7 @@ private:
     void createDescriptor() override;
 
     Texture m_forwardDepth;
+    Texture m_placeholderTexture;
 
     glm::vec3 m_cameraPosition = glm::vec3(0., 0., 3.0);
     glm::mat4 m_model = glm::mat4(1.0f);

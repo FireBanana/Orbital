@@ -98,7 +98,7 @@ void Graphics::makeDevice()
     vkEnumeratePhysicalDevices(Global::g_instance, &gpuCount, devices.data());
 
     std::cout << "Found " << gpuCount << " gpus" << std::endl;
-    int selectedDevice = 0;
+    int selectedDevice = 1;
 
     Global::g_physical_device = devices[selectedDevice];
 
@@ -113,8 +113,9 @@ void Graphics::makeDevice()
     float priority = 0.5;
     const char *extensions[] = {"VK_KHR_swapchain"};
 
-    VkPhysicalDeviceVulkan14Features enableVulkan14Features{
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES, .pushDescriptor = VK_TRUE};
+    VkPhysicalDeviceVulkan14Features
+        enableVulkan14Features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+                               .pushDescriptor = VK_TRUE};
 
     VkPhysicalDeviceVulkan11Features enableVulkan11Features
         = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
@@ -920,13 +921,15 @@ std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
             }
 
             if (texType != TextureType::None) {
-                modelTex[texType] = makeImage(
-                    {model.textures[texId].width,
-                     model.textures[texId].height,
-                     VK_FORMAT_R8G8B8A8_SRGB,
-                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                     VK_IMAGE_ASPECT_COLOR_BIT},
-                    &model.textures[texId]);
+                modelTex[texType] = makeImage({model.textures[texId].width,
+                                               model.textures[texId].height,
+                                               texType == TextureType::Normal
+                                                   ? VK_FORMAT_R8G8B8A8_UNORM
+                                                   : VK_FORMAT_R8G8B8A8_SRGB,
+                                               VK_IMAGE_USAGE_SAMPLED_BIT
+                                                   | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                               VK_IMAGE_ASPECT_COLOR_BIT},
+                                              &model.textures[texId]);
 
                 textureCache.insert({texId, modelTex[texType]});
             }

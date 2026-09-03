@@ -99,10 +99,17 @@ std::tuple<std::vector<Mesh>, std::vector<Image>> AssetLoader::internalLoadModel
                     };
 
                     // Diffuse
-                    setTexture(mat.pbrData.baseColorTexture, TextureType::Diffuse);
+                    if (mat.pbrData.baseColorTexture.has_value())
+                        setTexture(mat.pbrData.baseColorTexture, TextureType::Diffuse);
 
                     // Normal
-                    setTexture(mat.normalTexture, TextureType::Normal);
+                    if (mat.normalTexture.has_value())
+                        setTexture(mat.normalTexture, TextureType::Normal);
+
+                    // Roughness
+                    if (mat.pbrData.metallicRoughnessTexture.has_value())
+                        setTexture(mat.pbrData.metallicRoughnessTexture,
+                                   TextureType::MetallicRoughness);
                 }
 
                 // Positions

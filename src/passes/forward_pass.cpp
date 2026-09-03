@@ -15,9 +15,26 @@ ForwardPass::ForwardPass(Graphics *graphics)
     addAttachments();
     addDepth(&m_forwardDepth);
 
+    // Create 1x1 texture placeholder
+    Image image{};
+    image.width = 1;
+    image.height = 1;
+    image.channels = 4;
+    image.data = new unsigned char[]{1, 1, 1, 1};
+    m_placeholderTexture = graphics->makeImage({1,
+                                                1,
+                                                VK_FORMAT_R8G8B8A8_SRGB,
+                                                VK_IMAGE_USAGE_SAMPLED_BIT
+                                                    | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+                                                VK_IMAGE_ASPECT_COLOR_BIT},
+                                               &image);
+
     createSampler();
     createDescriptor();
+    initialize();
     createPipeline();
+
+    delete image.data;
 }
 
 void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
@@ -120,36 +137,35 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
             vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
             vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
 
-            VkDescriptorImageInfo diffuseImageInfo{};
-            diffuseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            diffuseImageInfo.imageView = model.textures[TextureType::Diffuse].view;
-            diffuseImageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+            std::vector<VkDescriptorImageInfo> imageInfos{};
+            imageInfos.reserve(m_descriptorImageLayoutbindings.size());
+            std::vector<VkWriteDescriptorSet> writeSets{};
+            writeSets.reserve(m_descriptorImageLayoutbindings.size());
 
-            VkDescriptorImageInfo normalImageInfo{};
-            normalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            normalImageInfo.imageView = model.textures[TextureType::Normal].view;
-            normalImageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+            for (auto &layoutBinding : m_descriptorImageLayoutbindings) {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfo.imageView = model.textures[layoutBinding.textureType].view
+                                              == VK_NULL_HANDLE
+                                          ? m_placeholderTexture.view
+                                          : model.textures[layoutBinding.textureType].view;
+                imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+                imageInfos.push_back(imageInfo);
 
-            VkWriteDescriptorSet diffuseWriteSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-            diffuseWriteSet.dstBinding = 0;
-            diffuseWriteSet.descriptorCount = 1;
-            diffuseWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            diffuseWriteSet.pImageInfo = &diffuseImageInfo;
-
-            VkWriteDescriptorSet normalWriteSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-            normalWriteSet.dstBinding = 1;
-            normalWriteSet.descriptorCount = 1;
-            normalWriteSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            normalWriteSet.pImageInfo = &normalImageInfo;
-
-            std::array<VkWriteDescriptorSet, 2> sets{diffuseWriteSet, normalWriteSet};
+                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                writeSet.dstBinding = layoutBinding.layoutBinding.binding;
+                writeSet.descriptorCount = 1;
+                writeSet.descriptorType = layoutBinding.layoutBinding.descriptorType;
+                writeSet.pImageInfo = &imageInfos.back();
+                writeSets.push_back(writeSet);
+            }
 
             vkCmdPushDescriptorSet(*cmd,
                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
                                    m_pipelineLayout,
                                    0,
-                                   2,
-                                   sets.data());
+                                   writeSets.size(),
+                                   writeSets.data());
 
             vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
         }
@@ -299,27 +315,18 @@ void ForwardPass::createSampler()
 
 void ForwardPass::createDescriptor()
 {
-    VkDescriptorSetLayoutBinding diffuseBinding{};
-    diffuseBinding.binding = 0;
-    diffuseBinding.descriptorCount = 1;
-    diffuseBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    diffuseBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    diffuseBinding.pImmutableSamplers = &m_sampler;
+    addImageDescriptor(0,
+                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                       VK_SHADER_STAGE_FRAGMENT_BIT,
+                       TextureType::Diffuse);
+    addImageDescriptor(1,
+                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                       VK_SHADER_STAGE_FRAGMENT_BIT,
+                       TextureType::Normal);
 
-    VkDescriptorSetLayoutBinding normalBinding{};
-    normalBinding.binding = 1;
-    normalBinding.descriptorCount = 1;
-    normalBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    normalBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    normalBinding.pImmutableSamplers = &m_sampler;
-
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings{diffuseBinding, normalBinding};
-
-    VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    info.flags
-        = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-    info.bindingCount = 2;
-    info.pBindings = bindings.data();
-
-    vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &m_descriptorSetLayout);
+    //check availability
+    addImageDescriptor(2,
+                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                       VK_SHADER_STAGE_FRAGMENT_BIT,
+                       TextureType::MetallicRoughness);
 }
