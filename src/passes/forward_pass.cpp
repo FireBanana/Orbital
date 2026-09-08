@@ -17,10 +17,11 @@ ForwardPass::ForwardPass(Graphics *graphics)
 
     // Create 1x1 texture placeholder
     Image image{};
+    std::vector<unsigned char> data{255, 255, 255, 255};
     image.width = 1;
     image.height = 1;
     image.channels = 4;
-    image.data = new unsigned char[]{1, 1, 1, 1};
+    image.data = data.data();
     m_placeholderTexture = graphics->makeImage({1,
                                                 1,
                                                 VK_FORMAT_R8G8B8A8_SRGB,
@@ -33,8 +34,6 @@ ForwardPass::ForwardPass(Graphics *graphics)
     createDescriptor();
     initialize();
     createPipeline();
-
-    delete image.data;
 }
 
 void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
@@ -106,7 +105,6 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     if (m_models != nullptr) {
         for (auto &model : *m_models) {
             // updates go here
-
             m_projection = glm::perspectiveZO(glm::radians(60.0f),
                                               static_cast<float>(
                                                   m_graphics->getSwapchainSize().width)
@@ -123,6 +121,7 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                            m_view,
                            m_projection,
                            glm::vec4(m_cameraPosition.x, m_cameraPosition.y, m_cameraPosition.z, 0),
+                           glm::vec4(model.roughness),
                            0};
             //
 

@@ -1,5 +1,6 @@
 #include "window.h"
 #include "global.h"
+#include "imgui.h"
 #include <iostream>
 
 Window::Window()
@@ -114,6 +115,9 @@ void Window::registerKey(std::function<void(int key, int scancode, int action, i
 
     glfwSetKeyCallback(Global::g_window,
                        [](GLFWwindow *window, int key, int scancode, int action, int mods) {
+                           if (ImGui::GetIO().WantCaptureKeyboard)
+                               return;
+
                            auto *state = static_cast<WindowContext *>(
                                glfwGetWindowUserPointer(window));
                            state->keyCallback(key, scancode, action, mods);
@@ -126,6 +130,9 @@ void Window::registerMouseButton(std::function<void(int button, int action, int 
 
     glfwSetMouseButtonCallback(Global::g_window,
                                [](GLFWwindow *window, int button, int action, int mods) {
+                                   if (ImGui::GetIO().WantCaptureMouse)
+                                       return;
+
                                    auto *state = static_cast<WindowContext *>(
                                        glfwGetWindowUserPointer(window));
                                    state->mouseButtonCallback(button, action, mods);
@@ -137,6 +144,9 @@ void Window::registerMousePosition(std::function<void(double, double)> cb)
     m_state.mousePositionCallback = cb;
 
     glfwSetCursorPosCallback(Global::g_window, [](GLFWwindow *window, double xpos, double ypos) {
+        if (ImGui::GetIO().WantCaptureMouse)
+            return;
+
         auto *state = static_cast<WindowContext *>(glfwGetWindowUserPointer(window));
         state->mousePositionCallback(xpos, ypos);
     });
@@ -147,6 +157,9 @@ void Window::registerMouseScroll(std::function<void(double, double)> cb)
     m_state.mouseScrollCallback = cb;
 
     glfwSetScrollCallback(Global::g_window, [](GLFWwindow *window, double xoffset, double yoffset) {
+        if (ImGui::GetIO().WantCaptureMouse)
+            return;
+
         auto *state = static_cast<WindowContext *>(glfwGetWindowUserPointer(window));
         state->mouseScrollCallback(xoffset, yoffset);
     });

@@ -4,6 +4,7 @@ struct UniformConstants
     float4x4 view;
     float4x4 projection;
     float4 camera;
+    float4 roughMetal; //2 unused
     uint32_t frame;
 };
 

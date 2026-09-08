@@ -10,6 +10,7 @@ struct UniformConstants
     float4x4 view;
     float4x4 projection;
     float4 camera;
+    float4 roughMetal; //2 unused
     uint32_t frame;
 };
 
@@ -21,7 +22,7 @@ struct VSOutput
     float2 Uv : TEXCOORD0;
 };
 
-static float3 g_light_dir = {-0.8, 1.0, 3.0};
+static float3 g_light_dir = {-5., 1., 0.};
 
 [[vk::push_constant]]
 UniformConstants state;
@@ -121,7 +122,7 @@ float4 main(VSOutput input) : SV_Target
     float4 normal = normal_texture.Sample(input.Uv);
     float4 color = diffuse_texture.Sample(input.Uv);
     float4 roughMetal = roughMetal_texture.Sample(input.Uv);
-    float roughness = roughMetal.g;
+    float roughness = roughMetal.g * state.roughMetal.r;
     float metal = roughMetal.b;
 
     var norm = input.Normal * normal.xyz;

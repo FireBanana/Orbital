@@ -2,7 +2,9 @@
 #define TYPES_H
 
 #include <cstdint>
+#include <functional>
 #include <glm/ext/matrix_float4x4.hpp>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -17,9 +19,18 @@ struct vec4
     float x, y, z, w;
 };
 
-struct Rect
+struct GuiRect
 {
     float x, y, width, height;
+};
+
+struct GuiSlider
+{
+    std::string name;
+    float min;
+    float max;
+    float value;
+    std::function<void(float)> valueChanged;
 };
 
 struct vec2

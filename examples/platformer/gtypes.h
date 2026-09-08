@@ -16,7 +16,7 @@ struct PhysicsComponent
 
 struct Sprite
 {
-    Rect rect;
+    GuiRect rect;
     uint32_t totalSpriteX;
     uint32_t totalSpriteY;
     uint32_t currentIndex;

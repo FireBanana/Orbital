@@ -34,47 +34,6 @@ GuiPass::GuiPass(Graphics *graphics)
 
 void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
-    // VkClearValue clearColorValue{};
-    // clearColorValue.color = {{0, 0, 0}};
-
-    // vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-
-    // VkViewport vp{};
-    // vp.x = 0;
-    // vp.y = static_cast<float>(Global::HEIGHT);
-    // vp.width = static_cast<float>(Global::WIDTH);
-    // vp.height = -static_cast<float>(Global::HEIGHT); // Flip viewport for Y up
-    // vp.minDepth = 0.0f;
-    // vp.maxDepth = 1.0f;
-
-    // vkCmdSetViewport(*cmd, 0, 1, &vp);
-
-    // VkRect2D scissor{};
-    // scissor.extent.width = Global::WIDTH;
-    // scissor.extent.height = Global::HEIGHT;
-
-    // vkCmdSetScissor(*cmd, 0, 1, &scissor);
-    // vkCmdSetCullMode(*cmd, VK_CULL_MODE_BACK_BIT);
-
-    // VkRenderingAttachmentInfo colorAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    // colorAttachment.imageView = m_attachments->at(imgIndex).view;
-    // colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    // colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    // colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    // colorAttachment.clearValue = clearColorValue;
-
-    // VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
-    // renderingInfo.renderArea.offset = {0, 0};
-    // renderingInfo.renderArea.extent.width = Global::WIDTH;
-    // renderingInfo.renderArea.extent.height = Global::HEIGHT;
-    // renderingInfo.layerCount = 1;
-    // renderingInfo.colorAttachmentCount = 1;
-    // renderingInfo.pColorAttachments = &colorAttachment;
-
-    // vkCmdBeginRendering(*cmd, &renderingInfo);
-    // vkCmdDraw(*cmd, 5, 1, 0, 0);
-    // vkCmdEndRendering(*cmd);
-
     VkClearValue clearColorValue{};
     clearColorValue.color = {{0, 0, 0}};
 
@@ -100,10 +59,16 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     // your UI
     //ImGui::ShowDemoWindow(); // or your own windows
 
+    for (auto &slider : m_sliders) {
+        if (ImGui::SliderFloat(slider.name.c_str(), &slider.value, slider.min, slider.max)) {
+            slider.valueChanged(slider.value);
+        }
+    }
+
     ImDrawList *drawList = ImGui::GetBackgroundDrawList();
 
     const float h = ImGui::GetIO().DisplaySize.y;
-    for (auto r : m_debugRects) {
+    for (auto &r : m_debugRects) {
         // r = {x, y, width, height} in Y-up sprite space (origin bottom-left)
         const float top = h - (r.y + r.height); // sprite top edge  -> ImGui min-Y
         const float bottom = h - r.y;           // sprite bottom    -> ImGui max-Y
@@ -111,7 +76,7 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
         drawList->AddRect({r.x, top}, {r.x + r.width, bottom}, IM_COL32(255, 255, 0, 255));
     }
 
-    for (auto [first, second] : m_debugLines) {
+    for (auto &[first, second] : m_debugLines) {
         drawList->AddLine({first.u, first.v}, {second.u, second.v}, IM_COL32(255, 255, 0, 255));
     }
 
@@ -125,7 +90,7 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     m_debugLines.clear();
 }
 
-void GuiPass::drawDebugRect(Rect rect)
+void GuiPass::drawDebugRect(GuiRect rect)
 {
     m_debugRects.push_back(rect);
 }
@@ -133,6 +98,14 @@ void GuiPass::drawDebugRect(Rect rect)
 void GuiPass::drawDebugLines(std::tuple<vec2, vec2> line)
 {
     m_debugLines.push_back(line);
+}
+
+void GuiPass::addSlider(std::string name,
+                        float min,
+                        float max,
+                        std::function<void(float)> valueChanged)
+{
+    m_sliders.push_back({name, min, max, (min + max) / 2.0f, valueChanged});
 }
 
 void GuiPass::createPipeline()

@@ -1,5 +1,6 @@
 #include "window.h"
 #include <passes/forward_pass.h>
+#include <passes/gui_pass.h>
 
 int main()
 {
@@ -9,7 +10,7 @@ int main()
     std::vector<Pass *> passes{new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
-    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/bistro.glb");
+    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/helmet.glb");
     auto nmap = g.makeNativeModel(map);
 
     std::vector<NativeModel> models{nmap};
@@ -69,6 +70,14 @@ int main()
                           cameraDistance * (glm::sin(yDelta * 0.01)),
                           cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
         });
+
+    // Call after input is registered because our input wipes dear imgui input
+    passes.push_back(new GuiPass(&g));
+    auto gPass = static_cast<GuiPass *>(passes[1]);
+    gPass->addSlider("roughness", 0., 1., [&models](float roughness) {
+        for (auto &m : models)
+            m.roughness = roughness;
+    });
 
     g.beginRenderLoop(passes, cPasses, [](double, double) {});
 }
