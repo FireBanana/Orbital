@@ -8,10 +8,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
 
 # ===================RETRIEVE LIBRARIES==================
+
+FetchContent_Declare(
+    volk
+    GIT_REPOSITORY https://github.com/zeux/volk
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(volk)
+
+FetchContent_Declare(
+    glfw
+    GIT_REPOSITORY https://github.com/glfw/glfw
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(glfw)
 
 FetchContent_Declare(
     vma
@@ -72,14 +85,14 @@ add_library(imgui STATIC
 )
 
 # No support for X11 planned
-target_compile_definitions(imgui PRIVATE IMGUI_IMPL_GLFW_DISABLE_X11)
+target_compile_definitions(imgui PRIVATE IMGUI_IMPL_GLFW_DISABLE_X11 IMGUI_IMPL_VULKAN_USE_VOLK)
 
 target_include_directories(imgui PUBLIC
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
 )
 
-target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw GPUOpen::VulkanMemoryAllocator)
+target_link_libraries(imgui PUBLIC Vulkan::Vulkan glfw GPUOpen::VulkanMemoryAllocator volk)
 
 # =====================SHADER COMPILATION=================
 
@@ -128,12 +141,14 @@ set(SOURCES
         src/window.h src/window.cpp
         src/passes/pass.h
         src/passes/forward_pass.h src/passes/forward_pass.cpp
-        src/passes/gui_pass.h src/passes/gui_pass.cpp)
+        src/passes/gui_pass.h src/passes/gui_pass.cpp
+        src/passes/shadow_pass.h src/passes/shadow_pass.cpp)
 
 add_library(Orbital ${SOURCES})
 
 orbital_add_shaders(Orbital ${CMAKE_CURRENT_SOURCE_DIR}/shaders
     triangle.vert.slang triangle.frag.slang
+    shadow.vert.slang
     line.vert.slang line.frag.slang
     gravity.comp.slang)
 

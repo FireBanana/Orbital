@@ -50,7 +50,14 @@ enum class TextureType : int8_t {
     Diffuse = 0,
     Normal = 1,
     MetallicRoughness = 2,
-    Count = 3 // This is used as the total count
+
+    // Additional textures (4 allowed right now for no reason)
+    Texture0 = 3,
+    Texture1 = 4,
+    Texture2 = 5,
+    Texture3 = 6,
+
+    Count = 7 // This is used as the total count
 };
 
 struct Mesh

@@ -212,26 +212,26 @@ void TwoDPass::createPipeline()
     vkCreateGraphicsPipelines(Global::g_device, VK_NULL_HANDLE, 1, &info, nullptr, &m_pipeline);
 }
 
-void TwoDPass::createDescriptor()
-{
-    VkDescriptorSetLayoutBinding binding{};
-    binding.binding = 0;
-    binding.descriptorCount = 1;
-    binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    binding.pImmutableSamplers = &m_sampler;
+// void TwoDPass::createDescriptor()
+// {
+//     VkDescriptorSetLayoutBinding binding{};
+//     binding.binding = 0;
+//     binding.descriptorCount = 1;
+//     binding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+//     binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+//     binding.pImmutableSamplers = &m_sampler;
 
-    VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
-    info.flags
-        = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-    info.bindingCount = 1;
-    info.pBindings = &binding;
+//     VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+//     info.flags
+//         = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
+//     info.bindingCount = 1;
+//     info.pBindings = &binding;
 
-    vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &m_descriptorSetLayout);
-}
+//     vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &m_descriptorSetLayout);
+// }
 
 void TwoDPass::createSampler()
 {
     VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-    vkCreateSampler(Global::g_device, &info, nullptr, &m_sampler);
+    //vkCreateSampler(Global::g_device, &info, nullptr, &m_sampler);
 }

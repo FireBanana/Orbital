@@ -1,7 +1,8 @@
 #define VMA_IMPLEMENTATION
 // To dynamically load vulkan functions in Vma - change if using volk
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 0
+#define VMA_STATIC_VULKAN_FUNCTIONS 1
+#define VOLK_IMPLEMENTATION
 #include "global.h"
 #include "graphics.h"
 #include "passes/pass.h"
@@ -62,6 +63,8 @@ VkShaderModule Graphics::getShaderModule(const std::string path, VkShaderStageFl
 
 void Graphics::makeInstance()
 {
+    volkInitialize();
+
     uint32_t instExtensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &instExtensionCount, nullptr);
 
@@ -77,16 +80,24 @@ void Graphics::makeInstance()
     uint32_t extCount = 0;
     auto extensions = glfwGetRequiredInstanceExtensions(&extCount);
 
+    std::vector<const char *> exts;
+    for (int i = 0; i < extCount; ++i) {
+        exts.push_back(extensions[i]);
+    }
+    exts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
     VkInstanceCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     info.pApplicationInfo = &appInfo;
-    info.enabledExtensionCount = extCount;
-    info.ppEnabledExtensionNames = extensions;
+    info.enabledExtensionCount = exts.size();
+    info.ppEnabledExtensionNames = exts.data();
 
     if (vkCreateInstance(&info, nullptr, &Global::g_instance) == VK_SUCCESS)
         std::cout << "Created instance" << std::endl;
     else
         std::cout << "Creation instance failed" << std::endl;
+
+    volkLoadInstance(Global::g_instance);
 }
 
 void Graphics::makeDevice()
@@ -98,7 +109,7 @@ void Graphics::makeDevice()
     vkEnumeratePhysicalDevices(Global::g_instance, &gpuCount, devices.data());
 
     std::cout << "Found " << gpuCount << " gpus" << std::endl;
-    int selectedDevice = 1;
+    int selectedDevice = 0;
 
     Global::g_physical_device = devices[selectedDevice];
 
@@ -115,6 +126,7 @@ void Graphics::makeDevice()
 
     VkPhysicalDeviceVulkan14Features
         enableVulkan14Features{.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES,
+                               .dynamicRenderingLocalRead = VK_TRUE,
                                .pushDescriptor = VK_TRUE};
 
     VkPhysicalDeviceVulkan11Features enableVulkan11Features
@@ -153,6 +165,8 @@ void Graphics::makeDevice()
         std::cout << "Creating device failed" << std::endl;
 
     vkGetDeviceQueue(Global::g_device, Global::QUEUE_INDEX, 0, &Global::g_queue);
+
+    volkLoadDevice(Global::g_device);
 }
 
 Graphics::Graphics(Window *window)
@@ -190,20 +204,6 @@ Buffer Graphics::makeBuffer(BufferDescription desc, void *data)
 
     VkMemoryRequirements memReq;
     vkGetBufferMemoryRequirements(Global::g_device, result.buffer, &memReq);
-
-    //Assume memory index 0
-    // VkMemoryAllocateInfo allocInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
-    // allocInfo.allocationSize = memReq.size;
-    // allocInfo.memoryTypeIndex = findMemoryType(
-    //     Global::g_physical_device, // Add cached bit option
-    //     memReq.memoryTypeBits,
-    //     desc.memProperty);
-    // if (vkAllocateMemory(Global::g_device, &allocInfo, nullptr, &result.memory) == VK_SUCCESS)
-    //     std::cout << "Allocated triangle memory" << std::endl;
-    // else
-    //     std::cout << "Triangle memory failed" << std::endl;
-
-    // vkBindBufferMemory(Global::g_device, result.buffer, result.memory, 0);
 
     // Should also handle cases where its both host and local, or at least output error
     if (data != nullptr && desc.memProperty & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
@@ -284,6 +284,8 @@ Buffer Graphics::makeBuffer(BufferDescription desc, void *data)
         memcpy(result.mappedData, data, (size_t) desc.bufferSize);
         //vkUnmapMemory(Global::g_device, result.memory);
         vmaUnmapMemory(Global::g_allocator, result.memory);
+    } else {
+        std::cout << "Error! Unhandled buffer creation" << std::endl;
     }
 
     return result;
@@ -506,8 +508,24 @@ void Graphics::makeRenderTarget(bool isRecreate)
 void Graphics::makeAllocator()
 {
     VmaVulkanFunctions vulkanFunctions{};
-    vulkanFunctions.vkGetInstanceProcAddr = &vkGetInstanceProcAddr;
-    vulkanFunctions.vkGetDeviceProcAddr = &vkGetDeviceProcAddr;
+    vulkanFunctions.vkAllocateMemory                    = vkAllocateMemory;
+    vulkanFunctions.vkBindBufferMemory                  = vkBindBufferMemory;
+    vulkanFunctions.vkBindImageMemory                   = vkBindImageMemory;
+    vulkanFunctions.vkCreateBuffer                      = vkCreateBuffer;
+    vulkanFunctions.vkCreateImage                       = vkCreateImage;
+    vulkanFunctions.vkDestroyBuffer                     = vkDestroyBuffer;
+    vulkanFunctions.vkDestroyImage                      = vkDestroyImage;
+    vulkanFunctions.vkFlushMappedMemoryRanges           = vkFlushMappedMemoryRanges;
+    vulkanFunctions.vkFreeMemory                        = vkFreeMemory;
+    vulkanFunctions.vkGetBufferMemoryRequirements       = vkGetBufferMemoryRequirements;
+    vulkanFunctions.vkGetImageMemoryRequirements        = vkGetImageMemoryRequirements;
+    vulkanFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
+    vulkanFunctions.vkGetPhysicalDeviceProperties       = vkGetPhysicalDeviceProperties;
+    vulkanFunctions.vkInvalidateMappedMemoryRanges      = vkInvalidateMappedMemoryRanges;
+    vulkanFunctions.vkMapMemory                         = vkMapMemory;
+    vulkanFunctions.vkUnmapMemory                       = vkUnmapMemory;
+    vulkanFunctions.vkCmdCopyBuffer                     = vkCmdCopyBuffer;
+
 
     VmaAllocatorCreateInfo info{};
     info.instance = Global::g_instance;

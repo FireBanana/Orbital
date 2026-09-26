@@ -6,26 +6,30 @@ static const float rpi = 1.0f / PI;
 
 struct UniformConstants
 {
-    float4x4 model;
     float4x4 view;
     float4x4 projection;
+    float4x4 lightVP;
     float4 camera;
-    float4 roughMetal; //2 unused
+    float4 lightPos;
     uint32_t frame;
+};
+
+struct ModelConstants
+{
+    float4x4 model;
+    float4 roughMetal; //2 unused
 };
 
 struct VSOutput
 {
     float4 Position : SV_POSITION;
     float4 WorldPos;
+    float4 LightSpacePos;
     float3 Normal : NORMAL;
     float2 Uv : TEXCOORD0;
 };
 
-static float3 g_light_dir = {-5., 1., 0.};
-
-[[vk::push_constant]]
-UniformConstants state;
+//static float3 g_light_dir = {5., 5., 0.};
 
 [[vk::binding(0, 0)]]
 Sampler2D diffuse_texture;
@@ -36,12 +40,24 @@ Sampler2D normal_texture;
 [[vk::binding(2, 0)]]
 Sampler2D roughMetal_texture;
 
+[[vk::binding(3, 0)]] //Shadow  map
+Sampler2DShadow texture0;
+
+[[vk::push_constant]]
+ModelConstants modelState;
+
+[[vk::binding(4, 0)]]
+ConstantBuffer<UniformConstants> uniformState;
+
+//[[vk::binding(4, 0)]]
+//Sampler2D texture1;
+
 float schlick(half3 normal, half3 pos)
 {
     half ior_air = 1.0003;
     half ior_skin = 1.55;
 
-    half a = acos(dot(normal, normalize(state.camera.xyz - pos))) / 2.0;
+    half a = acos(dot(normal, normalize(uniformState.camera.xyz - pos))) / 2.0;
     half r0 = pow(((ior_air - ior_skin) / (ior_air + ior_skin)), 2.0);
 
     return pow(r0 + (1. - r0)*(1. - cos(a)), 5.0);
@@ -122,17 +138,22 @@ float4 main(VSOutput input) : SV_Target
     float4 normal = normal_texture.Sample(input.Uv);
     float4 color = diffuse_texture.Sample(input.Uv);
     float4 roughMetal = roughMetal_texture.Sample(input.Uv);
-    float roughness = roughMetal.g * state.roughMetal.r;
+    float roughness = roughMetal.g * modelState.roughMetal.r;
     float metal = roughMetal.b;
 
+    // shadows
+    var lightSpacePos = input.LightSpacePos / input.LightSpacePos.w;
+    float shadow = texture0.SampleCmp(lightSpacePos.xy, lightSpacePos.z - 0.005);
+    //
+
     var norm = input.Normal * normal.xyz;
-    float3 light = max(dot(normalize(g_light_dir), normalize(norm)), float3(0.));
+    float3 light = max(dot(normalize(uniformState.lightPos.xyz), normalize(norm)), float3(0.));
     float ambient = 1.;
 
-    float3x3 model = (float3x3)state.model;
+    float3x3 model = (float3x3)modelState.model;
     float3 n = normalize(input.Normal * normal.xyz);
-    float3 l = normalize(mul(g_light_dir, model));
-    float3 v = normalize(mul(state.camera.xyz - input.WorldPos.xyz, model));
+    float3 l = normalize(mul(uniformState.lightPos.xyz, model));
+    float3 v = normalize(mul(uniformState.camera.xyz - input.WorldPos.xyz, model));
 
     var spec = specular(v, l, n, roughness);
     spec *= max(0.0, dot(n, l));
@@ -144,5 +165,8 @@ float4 main(VSOutput input) : SV_Target
     col = col / (col + 1.);
     col = pow(col, 1/2.2);
 
+    col *= shadow;
+
+    return float4(shadow);
     return float4(col, 1.);
 }

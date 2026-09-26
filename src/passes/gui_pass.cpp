@@ -34,6 +34,11 @@ GuiPass::GuiPass(Graphics *graphics)
 
 void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
+    VkDebugUtilsLabelEXT label{VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT};
+    label.pLabelName = "Gui Pass";
+
+    vkCmdBeginDebugUtilsLabelEXT(*cmd, &label);
+
     VkClearValue clearColorValue{};
     clearColorValue.color = {{0, 0, 0}};
 
@@ -88,6 +93,8 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     m_debugRects.clear();
     m_debugLines.clear();
+
+    vkCmdEndDebugUtilsLabelEXT(*cmd);
 }
 
 void GuiPass::drawDebugRect(GuiRect rect)

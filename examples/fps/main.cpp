@@ -1,13 +1,14 @@
 #include "window.h"
 #include <passes/forward_pass.h>
 #include <passes/gui_pass.h>
+#include <passes/shadow_pass.h>
 
 int main()
 {
     Window w{};
     Graphics g{&w};
 
-    std::vector<Pass *> passes{new ForwardPass{&g}};
+    std::vector<Pass *> passes{new ShadowPass{&g}, new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
     auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/helmet.glb");
@@ -15,14 +16,24 @@ int main()
 
     std::vector<NativeModel> models{nmap};
 
-    passes[0]->attachModels(&models);
+    auto sPass = static_cast<ShadowPass *>(passes[0]);
+    auto fPass = static_cast<ForwardPass *>(passes[1]);
+
+    const auto *shadowMap = sPass->getShadowMap();
+
+    //glm::vec3 light{0, 5, 0};
+
+    sPass->attachModels(&models);
+    //sPass->setLightPosition(light);
+    fPass->attachModels(&models);
+    fPass->setShadowMap(shadowMap);
+    //fPass->setLightVPMatrix(sPass->getLightVPMatrix());
+    //fPass->setLightPosition(light);
 
     bool isPressed;
     bool newClick;
     double xDelta = 0, yDelta = 0;
     double cameraDistance = 3;
-
-    auto fPass = static_cast<ForwardPass *>(passes[0]);
 
     w.registerMouseButton([&isPressed, &newClick](int button, int action, int mod) {
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -73,11 +84,17 @@ int main()
 
     // Call after input is registered because our input wipes dear imgui input
     passes.push_back(new GuiPass(&g));
-    auto gPass = static_cast<GuiPass *>(passes[1]);
+    auto gPass = static_cast<GuiPass *>(passes[2]);
     gPass->addSlider("roughness", 0., 1., [&models](float roughness) {
         for (auto &m : models)
             m.roughness = roughness;
     });
 
-    g.beginRenderLoop(passes, cPasses, [](double, double) {});
+    g.beginRenderLoop(passes, cPasses, [&sPass, &fPass](double time, double deltaTime) {
+        glm::vec3 lp(glm::sin(time * 0.001), glm::cos(time * 0.001), 0.);
+
+        sPass->setLightPosition(lp);
+        fPass->setLightVPMatrix(sPass->getLightVPMatrix());
+        fPass->setLightPosition(lp);
+    });
 }

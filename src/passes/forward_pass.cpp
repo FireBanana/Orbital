@@ -1,16 +1,17 @@
-#include "forward_pass.h"
 #include "../global.h"
 #include "../graphics.h"
+#include "forward_pass.h"
 #include <iostream>
 
 ForwardPass::ForwardPass(Graphics *graphics)
     : Pass(graphics)
 {
-    m_forwardDepth = graphics->makeImage({m_graphics->getSwapchainSize().width,
-                                          m_graphics->getSwapchainSize().height,
-                                          Global::DEPTH_FORMAT,
-                                          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                          VK_IMAGE_ASPECT_DEPTH_BIT});
+    m_forwardDepth = graphics->makeImage(
+        {m_graphics->getSwapchainSize().width,
+         m_graphics->getSwapchainSize().height,
+         Global::DEPTH_FORMAT,
+         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+         VK_IMAGE_ASPECT_DEPTH_BIT});
 
     addAttachments();
     addDepth(&m_forwardDepth);
@@ -22,13 +23,20 @@ ForwardPass::ForwardPass(Graphics *graphics)
     image.height = 1;
     image.channels = 4;
     image.data = data.data();
-    m_placeholderTexture = graphics->makeImage({1,
-                                                1,
-                                                VK_FORMAT_R8G8B8A8_SRGB,
-                                                VK_IMAGE_USAGE_SAMPLED_BIT
-                                                    | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                                VK_IMAGE_ASPECT_COLOR_BIT},
-                                               &image);
+    m_placeholderTexture = graphics->makeImage(
+        {1,
+         1,
+         VK_FORMAT_R8G8B8A8_SRGB,
+         VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+         VK_IMAGE_ASPECT_COLOR_BIT},
+        &image);
+
+    // uniform buffer
+    m_uniformConstantBuffer = graphics->makeBuffer({
+        .bufferSize = sizeof(UniformConstants),
+        .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        .memProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    });
 
     createSampler();
     createDescriptor();
@@ -38,6 +46,11 @@ ForwardPass::ForwardPass(Graphics *graphics)
 
 void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 {
+    VkDebugUtilsLabelEXT label{VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT};
+    label.pLabelName = "Forward Pass";
+
+    vkCmdBeginDebugUtilsLabelEXT(*cmd, &label);
+
     //------------------------------
 
     VkClearValue clearColorValue{}, depthClearValue{};
@@ -67,17 +80,17 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     renderingInfo.pColorAttachments = &colorAttachment;
     renderingInfo.pDepthAttachment = &depthAttachment;
 
-    m_graphics->transitionImageLayout(*cmd,
-                                      m_depth->image,
-                                      VK_IMAGE_LAYOUT_UNDEFINED,
-                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                                      VK_IMAGE_ASPECT_DEPTH_BIT,
-                                      VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
-                                      VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
-                                          | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
-                                      VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
-                                      VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
-                                          | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
+    m_graphics->transitionImageLayout(
+        *cmd,
+        m_depth->image,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+            | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+        VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT);
 
     vkCmdBeginRendering(*cmd, &renderingInfo);
 
@@ -101,47 +114,84 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
     vkCmdSetScissor(*cmd, 0, 1, &scissor);
     vkCmdSetCullMode(*cmd, VK_CULL_MODE_BACK_BIT);
 
+    auto shadowBinding = m_descriptorImageLayoutbindings[static_cast<int>(TextureType::Texture0)];
+    auto uniformBinding = m_descriptorBufferLayoutBindings[0]; // binding index 4
+
+    // Update uniform buffer
+    {
+        m_projection = glm::perspectiveZO(glm::radians(60.0f),
+                                          static_cast<float>(m_graphics->getSwapchainSize().width)
+                                              / static_cast<float>(
+                                                  m_graphics->getSwapchainSize().height),
+                                          0.1f,
+                                          1000.0f);
+
+        m_view = glm::lookAt(m_cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        m_constants = {m_view,
+                       m_projection,
+                       m_lightVP,
+                       glm::vec4(m_cameraPosition.x, m_cameraPosition.y, m_cameraPosition.z, 0),
+                       glm::vec4(m_lightPosition, 0.),
+                       0};
+
+        memcpy(m_uniformConstantBuffer.mappedData, &m_constants, sizeof(UniformConstants));
+    }
+
     //forward pass
     if (m_models != nullptr) {
+        int modelIndex = 0;
+
         for (auto &model : *m_models) {
-            // updates go here
-            m_projection = glm::perspectiveZO(glm::radians(60.0f),
-                                              static_cast<float>(
-                                                  m_graphics->getSwapchainSize().width)
-                                                  / static_cast<float>(
-                                                      m_graphics->getSwapchainSize().height),
-                                              0.1f,
-                                              1000.0f);
-
-            m_view = glm::lookAt(m_cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
-            m_constants = {glm::translate(model.worldTransform,
-                                          glm::vec3(model.position.x,
-                                                    model.position.y,
-                                                    model.position.z)),
-                           m_view,
-                           m_projection,
-                           glm::vec4(m_cameraPosition.x, m_cameraPosition.y, m_cameraPosition.z, 0),
-                           glm::vec4(model.roughness),
-                           0};
-            //
-
-            vkCmdPushConstants(*cmd,
-                               m_pipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0,
-                               sizeof(UniformConstants),
-                               &m_constants);
-
             VkDeviceSize offset{0};
             vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
             vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
 
             std::vector<VkDescriptorImageInfo> imageInfos{};
             imageInfos.reserve(m_descriptorImageLayoutbindings.size());
+            std::vector<VkDescriptorBufferInfo> bufferInfos{};
+            bufferInfos.reserve(m_descriptorBufferLayoutBindings.size());
             std::vector<VkWriteDescriptorSet> writeSets{};
-            writeSets.reserve(m_descriptorImageLayoutbindings.size());
+            writeSets.reserve(m_descriptorImageLayoutbindings.size()
+                              + m_descriptorBufferLayoutBindings.size());
 
+            // Add shadow map
+            {
+                VkDescriptorImageInfo imageInfo{};
+                imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+                imageInfo.imageView = m_shadowMap->view;
+                imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+                imageInfos.push_back(imageInfo);
+
+                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                writeSet.dstBinding = shadowBinding.layoutBinding.binding;
+                writeSet.descriptorCount = 1;
+                writeSet.descriptorType = shadowBinding.layoutBinding.descriptorType;
+                writeSet.pImageInfo = &imageInfos.back();
+                writeSets.push_back(writeSet);
+            }
+
+            // Attach uniform buffer
+            {
+                VkDescriptorBufferInfo bufferInfo{};
+                bufferInfo.buffer = m_uniformConstantBuffer.buffer;
+                bufferInfo.offset = 0;
+                bufferInfo.range = sizeof(UniformConstants);
+                bufferInfos.push_back(bufferInfo);
+
+                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                writeSet.dstBinding = uniformBinding.binding;
+                writeSet.descriptorCount = 1;
+                writeSet.descriptorType = uniformBinding.descriptorType;
+                writeSet.pBufferInfo = &bufferInfos.back();
+                writeSets.push_back(writeSet);
+            }
+
+            // Images
             for (auto &layoutBinding : m_descriptorImageLayoutbindings) {
+                if (layoutBinding.textureType >= TextureType::Texture0)
+                    continue;
+
+                Texture tex = model.textures[layoutBinding.textureType];
                 VkDescriptorImageInfo imageInfo{};
                 imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfo.imageView = model.textures[layoutBinding.textureType].view
@@ -159,6 +209,39 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                 writeSets.push_back(writeSet);
             }
 
+            //Buffers
+            for (auto &layoutBinding : m_descriptorBufferLayoutBindings) {
+                if (layoutBinding.binding
+                    == 4) //Skipping the uniform buffer, have type like texture?
+                    continue;
+
+                VkDescriptorBufferInfo bufferInfo{};
+                //bufferInfo.buffer = m_uniformConstantBuffer.buffer;
+                //bufferInfo.offset = {0};
+                //bufferInfo.range = sizeof(UniformConstants);
+                bufferInfos.push_back(bufferInfo);
+
+                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+                writeSet.dstBinding = layoutBinding.binding;
+                writeSet.descriptorCount = 1;
+                writeSet.descriptorType = layoutBinding.descriptorType;
+                writeSet.pBufferInfo = &bufferInfos.back();
+                writeSets.push_back(writeSet);
+            }
+
+            ModelConstants mc{glm::translate(model.worldTransform,
+                                             glm::vec3(model.position.x,
+                                                       model.position.y,
+                                                       model.position.z)),
+                              glm::vec4{model.roughness, 0., 0., 0.}};
+
+            vkCmdPushConstants(*cmd,
+                               m_pipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0,
+                               sizeof(ModelConstants),
+                               &mc);
+
             vkCmdPushDescriptorSet(*cmd,
                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
                                    m_pipelineLayout,
@@ -167,10 +250,24 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                                    writeSets.data());
 
             vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
+
+            modelIndex++;
         }
     }
 
     vkCmdEndRendering(*cmd);
+
+    vkCmdEndDebugUtilsLabelEXT(*cmd);
+}
+
+void ForwardPass::setShadowMap(const Texture *tex)
+{
+    m_shadowMap = tex;
+}
+
+void ForwardPass::setLightVPMatrix(glm::mat4 lightVP)
+{
+    m_lightVP = lightVP;
 }
 
 void ForwardPass::setCameraPosition(glm::vec3 position)
@@ -178,12 +275,17 @@ void ForwardPass::setCameraPosition(glm::vec3 position)
     m_cameraPosition = position;
 }
 
+void ForwardPass::setLightPosition(glm::vec3 lightPos)
+{
+    m_lightPosition = lightPos;
+}
+
 void ForwardPass::createPipeline()
 {
     VkPushConstantRange range{};
     range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     range.offset = 0;
-    range.size = sizeof(UniformConstants);
+    range.size = sizeof(ModelConstants);
 
     VkPipelineLayoutCreateInfo layoutInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
     layoutInfo.setLayoutCount = 1;
@@ -234,13 +336,12 @@ void ForwardPass::createPipeline()
     rasterInfo.depthBiasEnable = false;
     rasterInfo.lineWidth = 1.0;
 
-    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
-                                                  VK_DYNAMIC_STATE_SCISSOR,
-                                                  VK_DYNAMIC_STATE_CULL_MODE};
+    std::vector<VkDynamicState> dynamicStates
+        = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE};
 
     VkPipelineColorBlendAttachmentState blendAttachment{};
     blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
-                                      | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+                                     | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
     VkPipelineColorBlendStateCreateInfo blendStateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
@@ -270,13 +371,13 @@ void ForwardPass::createPipeline()
     std::array<VkPipelineShaderStageCreateInfo, 2> shaderStages = {
         {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = m_graphics->getShaderModule(ROOT "shaders/triangle.vert.spv",
-                                                VK_SHADER_STAGE_VERTEX_BIT),
+          .module
+          = m_graphics->getShaderModule(ROOT "shaders/triangle.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
           .pName = "main"},
          {.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
-          .module = m_graphics->getShaderModule(ROOT "shaders/triangle.frag.spv",
-                                                VK_SHADER_STAGE_FRAGMENT_BIT),
+          .module = m_graphics->getShaderModule(
+              ROOT "shaders/triangle.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT),
           .pName = "main"}}};
 
     VkPipelineRenderingCreateInfo renderingInfo{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
@@ -304,28 +405,21 @@ void ForwardPass::createPipeline()
 
     //delete shader modules
 };
-void ForwardPass::createSampler()
-{
-    VkSamplerCreateInfo info{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-    info.magFilter = VK_FILTER_LINEAR;
-    info.minFilter = VK_FILTER_LINEAR;
-    vkCreateSampler(Global::g_device, &info, nullptr, &m_sampler);
-}
 
 void ForwardPass::createDescriptor()
 {
-    addImageDescriptor(0,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                       VK_SHADER_STAGE_FRAGMENT_BIT,
-                       TextureType::Diffuse);
-    addImageDescriptor(1,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                       VK_SHADER_STAGE_FRAGMENT_BIT,
-                       TextureType::Normal);
+    addImageDescriptor(0, SamplerType::Color, VK_SHADER_STAGE_FRAGMENT_BIT, TextureType::Diffuse);
+    addImageDescriptor(1, SamplerType::Color, VK_SHADER_STAGE_FRAGMENT_BIT, TextureType::Normal);
 
-    //check availability
     addImageDescriptor(2,
-                       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                       SamplerType::Color,
                        VK_SHADER_STAGE_FRAGMENT_BIT,
                        TextureType::MetallicRoughness);
+
+    // Depth texture
+    addImageDescriptor(3, SamplerType::Depth, VK_SHADER_STAGE_FRAGMENT_BIT, TextureType::Texture0);
+
+    addBufferDescriptor(4,
+                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 }

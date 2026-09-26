@@ -4,14 +4,14 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #define GLFW_INCLUDE_VULKAN
 #include "asset_loader.h"
-
+#include <volk.h>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <string>
 #include <vk_mem_alloc.h>
-#include <vulkan/vulkan_core.h>
+//#include <vulkan/vulkan_core.h>
 
 class Pass;
 class Window;

@@ -13,6 +13,8 @@ public:
         TextureType textureType;
     };
 
+    enum class SamplerType { Color, Depth };
+
     explicit Pass(Graphics *graphics)
         : m_graphics(graphics)
     {}
@@ -33,19 +35,57 @@ public:
     inline void attachImageResources(std::vector<Texture> *textures) { m_textures = textures; }
 
     inline void addImageDescriptor(uint32_t binding,
-                                   VkDescriptorType type,
+                                   SamplerType type,
                                    VkShaderStageFlags flags,
                                    TextureType textureType)
     {
         VkDescriptorSetLayoutBinding layoutBinding{};
         layoutBinding.binding = binding;
         layoutBinding.descriptorCount = 1;
-        layoutBinding.descriptorType = type;
+        layoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         layoutBinding.stageFlags = flags;
-        if (type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-            layoutBinding.pImmutableSamplers = &m_sampler;
+        if (type == SamplerType::Color) {
+            if (m_samplers.find(SamplerType::Color) == m_samplers.end()) {
+                VkSampler sampler;
+                VkSamplerCreateInfo colorInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+                colorInfo.magFilter = VK_FILTER_LINEAR;
+                colorInfo.minFilter = VK_FILTER_LINEAR;
+                vkCreateSampler(Global::g_device, &colorInfo, nullptr, &sampler);
+
+                m_samplers.insert({SamplerType::Color, sampler});
+            }
+
+            layoutBinding.pImmutableSamplers = &m_samplers[SamplerType::Color];
+        } else if (type == SamplerType::Depth) {
+            if (m_samplers.find(SamplerType::Depth) == m_samplers.end()) {
+                VkSampler sampler;
+                VkSamplerCreateInfo depthInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+                depthInfo.magFilter = VK_FILTER_LINEAR;
+                depthInfo.minFilter = VK_FILTER_LINEAR;
+                depthInfo.compareEnable = VK_TRUE;
+                depthInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+                vkCreateSampler(Global::g_device, &depthInfo, nullptr, &sampler);
+
+                m_samplers.insert({SamplerType::Depth, sampler});
+            }
+
+            layoutBinding.pImmutableSamplers = &m_samplers[SamplerType::Depth];
+        }
 
         m_descriptorImageLayoutbindings.push_back({layoutBinding, textureType});
+    }
+
+    inline void addBufferDescriptor(uint32_t binding,
+                                    VkDescriptorType type,
+                                    VkShaderStageFlags flags)
+    {
+        VkDescriptorSetLayoutBinding layoutBinding{};
+        layoutBinding.binding = binding;
+        layoutBinding.descriptorCount = 1;
+        layoutBinding.stageFlags = flags;
+        layoutBinding.descriptorType = type;
+
+        m_descriptorBufferLayoutBindings.push_back(layoutBinding);
     }
 
     inline void initialize()
@@ -55,10 +95,13 @@ public:
         for (auto &i : m_descriptorImageLayoutbindings)
             bindings.push_back(i.layoutBinding);
 
+        for (auto &b : m_descriptorBufferLayoutBindings)
+            bindings.push_back(b);
+
         VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
         info.flags
             = VkDescriptorSetLayoutCreateFlagBits::VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT;
-        info.bindingCount = m_descriptorImageLayoutbindings.size();
+        info.bindingCount = bindings.size();
         info.pBindings = bindings.data();
 
         vkCreateDescriptorSetLayout(Global::g_device, &info, nullptr, &m_descriptorSetLayout);
@@ -72,20 +115,21 @@ public:
 protected:
     virtual inline void createPipeline() = 0;
     virtual inline void createDescriptor() {}
-    virtual inline void createSampler() {}
+    //virtual inline void createSampler() {}
 
     Graphics *m_graphics = nullptr;
     VkPipeline m_pipeline;
     VkPipelineLayout m_pipelineLayout;
     VkDescriptorSetLayout m_descriptorSetLayout;
-    VkSampler m_sampler;
+    std::unordered_map<SamplerType, VkSampler> m_samplers;
     std::vector<NativeModel> *m_models = nullptr;
     std::vector<Texture> *m_textures = nullptr;
     std::vector<Texture> *m_attachments = nullptr;
     std::vector<ImageDescriptorInfo> m_descriptorImageLayoutbindings;
+    std::vector<VkDescriptorSetLayoutBinding> m_descriptorBufferLayoutBindings;
     Texture *m_depth = nullptr;
 
-private:    
+private:
     bool m_isUsingEngineTargets = false;
 
     friend class Graphics;
