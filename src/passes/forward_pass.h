@@ -28,7 +28,7 @@ public:
     void setShadowMap(const Texture *tex);
     void setLightVPMatrix(glm::mat4 lightVP);
     void setCameraPosition(glm::vec3 position);
-    void setLightPosition(glm::vec3 lightPos);
+    void setLightDirection(glm::vec3 lightPos);
 
 private:
     void createPipeline() override;

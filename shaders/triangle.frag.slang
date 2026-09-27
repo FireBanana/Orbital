@@ -167,6 +167,6 @@ float4 main(VSOutput input) : SV_Target
 
     col *= shadow;
 
-    return float4(shadow);
+    //return float4(shadow);
     return float4(col, 1.);
 }

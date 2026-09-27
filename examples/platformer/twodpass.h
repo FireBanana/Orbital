@@ -19,7 +19,7 @@ public:
 protected:
     void createPipeline();
     void createDescriptor();
-    void createSampler();
+    //void createSampler();
 
 private:
     std::vector<Sprite *> m_Sprites;

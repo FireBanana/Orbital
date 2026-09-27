@@ -69,21 +69,22 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
     vkCmdSetScissor(*cmd, 0, 1, &scissor);
     vkCmdSetCullMode(*cmd, VK_CULL_MODE_BACK_BIT);
 
-    LightConstants c;
-    c.lightVP = m_lightVP;
-
-    vkCmdPushConstants(*cmd,
-                       m_pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT,
-                       0,
-                       sizeof(LightConstants),
-                       &c);
-
     if (m_models != nullptr) {
         for (auto &model : *m_models) {
             VkDeviceSize offset{0};
             vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
             vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
+
+            LightConstants c;
+            c.lightVP = m_lightVP;
+            c.model = model.worldTransform;
+
+            vkCmdPushConstants(*cmd,
+                               m_pipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT,
+                               0,
+                               sizeof(LightConstants),
+                               &c);
 
             vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
         }
@@ -106,12 +107,12 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
     vkCmdEndDebugUtilsLabelEXT(*cmd);
 }
 
-void ShadowPass::setLightPosition(glm::vec3 lightPos)
+void ShadowPass::setLightDirection(glm::vec3 lightPos)
 {
     m_lightPosition = lightPos;
 
-    glm::mat4 p = glm::orthoZO(-2.0, 2.0, -2.0, 2.0, 1.0, 7.5);
-    glm::mat4 v = glm::lookAt(m_lightPosition,
+    glm::mat4 p = glm::orthoZO(-20.0, 20.0, -20.0, 20.0, 1.0, 7.5);
+    glm::mat4 v = glm::lookAt(glm::normalize(m_lightPosition) * 2.0f + 1.0f,
                               glm::vec3(0.0f, 0.0f, 0.0f),
                               glm::vec3(0.0f, 1.0f, 0.0f));
 

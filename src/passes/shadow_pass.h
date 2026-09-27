@@ -6,6 +6,7 @@
 struct LightConstants
 {
     glm::mat4 lightVP;
+    glm::mat4 model;
 };
 
 class ShadowPass : public Pass
@@ -15,7 +16,7 @@ public:
 
     void render(VkCommandBuffer *cmd, uint32_t imageIndex) override;
 
-    void setLightPosition(glm::vec3 lightPos);
+    void setLightDirection(glm::vec3 lightPos);
 
     const Texture *getShadowMap() const;
     glm::mat4 getLightVPMatrix() const;

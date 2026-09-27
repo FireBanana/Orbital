@@ -1,6 +1,7 @@
 struct LightConstants
 {
     float4x4 lightVP;
+    float4x4 model;
 };
 
 struct VSInput
@@ -23,6 +24,6 @@ VSOutput main(VSInput input)
 {
     VSOutput output;
     // Todo add model matrix
-    output.Position = mul(state.lightVP, float4(input.Position, 1.0));
+    output.Position = mul(state.lightVP, mul(state.model, float4(input.Position, 1.0)));
     return output;
 }

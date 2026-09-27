@@ -62,6 +62,10 @@ public:
                 VkSamplerCreateInfo depthInfo{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
                 depthInfo.magFilter = VK_FILTER_LINEAR;
                 depthInfo.minFilter = VK_FILTER_LINEAR;
+                depthInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+                depthInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+                depthInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+                depthInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
                 depthInfo.compareEnable = VK_TRUE;
                 depthInfo.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
                 vkCreateSampler(Global::g_device, &depthInfo, nullptr, &sampler);

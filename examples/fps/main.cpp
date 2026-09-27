@@ -11,7 +11,7 @@ int main()
     std::vector<Pass *> passes{new ShadowPass{&g}, new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
-    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/helmet.glb");
+    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/sponza.glb");
     auto nmap = g.makeNativeModel(map);
 
     std::vector<NativeModel> models{nmap};
@@ -93,8 +93,8 @@ int main()
     g.beginRenderLoop(passes, cPasses, [&sPass, &fPass](double time, double deltaTime) {
         glm::vec3 lp(glm::sin(time * 0.001), glm::cos(time * 0.001), 0.);
 
-        sPass->setLightPosition(lp);
+        sPass->setLightDirection(lp);
         fPass->setLightVPMatrix(sPass->getLightVPMatrix());
-        fPass->setLightPosition(lp);
+        fPass->setLightDirection(lp);
     });
 }

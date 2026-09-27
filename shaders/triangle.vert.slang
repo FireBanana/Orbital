@@ -54,6 +54,6 @@ VSOutput main(VSInput input)
     output.WorldPos = mul(modelState.model, float4(input.Position, 1.0));
     output.Normal = input.Normal;
     output.Uv = input.Uv;
-    output.LightSpacePos = mul(biasMat, mul(uniformState.lightVP, float4(input.Position, 1.0)));
+    output.LightSpacePos = mul(biasMat, mul(uniformState.lightVP, output.WorldPos));
     return output;
 }

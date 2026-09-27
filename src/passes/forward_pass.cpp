@@ -38,7 +38,7 @@ ForwardPass::ForwardPass(Graphics *graphics)
         .memProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     });
 
-    createSampler();
+    //createSampler();
     createDescriptor();
     initialize();
     createPipeline();
@@ -275,7 +275,7 @@ void ForwardPass::setCameraPosition(glm::vec3 position)
     m_cameraPosition = position;
 }
 
-void ForwardPass::setLightPosition(glm::vec3 lightPos)
+void ForwardPass::setLightDirection(glm::vec3 lightPos)
 {
     m_lightPosition = lightPos;
 }
