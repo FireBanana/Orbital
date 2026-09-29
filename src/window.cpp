@@ -25,63 +25,6 @@ Window::Window()
 
     glfwSetWindowUserPointer(Global::g_window, &m_state);
 
-    // glfwSetMouseButtonCallback(Global::g_window,
-    //                            [](GLFWwindow *window, int button, int action, int mods) {
-    //                                auto *state = static_cast<WindowState *>(
-    //                                    glfwGetWindowUserPointer(window));
-
-    //                                if (button == GLFW_MOUSE_BUTTON_LEFT) {
-    //                                    if (action == GLFW_PRESS) {
-    //                                        state->isPressed = true;
-    //                                        state->newClick = true;
-    //                                    } else if (action == GLFW_RELEASE) {
-    //                                        state->isPressed = false;
-    //                                    }
-    //                                }
-    //                            });
-
-    // glfwSetCursorPosCallback(Global::g_window, [](GLFWwindow *window, double xpos, double ypos) {
-    //     static double lastXPosition = xpos, lastYPosition = ypos;
-
-    //     auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
-
-    //     if (!state->isPressed)
-    //         return;
-
-    //     if (state->newClick) {
-    //         lastXPosition = xpos;
-    //         lastYPosition = ypos;
-    //         state->newClick = false;
-    //     }
-
-    //     state->xDelta -= xpos - lastXPosition;
-    //     state->yDelta += ypos - lastYPosition;
-    //     state->yDelta = glm::clamp(state->yDelta, -130.0 + 0.01, 130.0 - 0.01);
-
-    //     Global::g_camera_position
-    //         = glm::vec3(state->cameraDistance
-    //                         * (glm::sin(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)),
-    //                     state->cameraDistance * (glm::sin(state->yDelta * 0.01)),
-    //                     state->cameraDistance
-    //                         * (glm::cos(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)));
-
-    //     lastXPosition = xpos;
-    //     lastYPosition = ypos;
-    // });
-
-    // glfwSetScrollCallback(Global::g_window, [](GLFWwindow *window, double xoffset, double yoffset) {
-    //     auto *state = static_cast<WindowState *>(glfwGetWindowUserPointer(window));
-
-    //     state->cameraDistance -= yoffset * 0.2;
-
-    //     Global::g_camera_position
-    //         = glm::vec3(state->cameraDistance
-    //                         * (glm::sin(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)),
-    //                     state->cameraDistance * (glm::sin(state->yDelta * 0.01)),
-    //                     state->cameraDistance
-    //                         * (glm::cos(state->xDelta * 0.01) * glm::cos(state->yDelta * 0.01)));
-    // });
-
     glfwSetFramebufferSizeCallback(Global::g_window, [](GLFWwindow *window, int width, int height) {
         auto *state = static_cast<WindowContext *>(glfwGetWindowUserPointer(window));
 

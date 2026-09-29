@@ -229,6 +229,7 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                 writeSets.push_back(writeSet);
             }
 
+            // Precompute this once as this is also being used in shadows
             ModelConstants mc{glm::translate(model.worldTransform,
                                              glm::vec3(model.position.x,
                                                        model.position.y,

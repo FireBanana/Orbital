@@ -4,13 +4,14 @@ ShadowPass::ShadowPass(Graphics *g)
     : Pass{g}
 {
     m_shadowMap = g->makeImage(
-        {1024 * 3,
-         1024 * 3,
+        {SHADOWMAP_SIZE,
+         SHADOWMAP_SIZE,
          Global::DEPTH_FORMAT,
          VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
          VK_IMAGE_ASPECT_DEPTH_BIT});
 
     addDepth(&m_shadowMap);
+    setDepthResizable(false);
 
     createPipeline();
 }
@@ -34,8 +35,8 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
 
     VkRenderingInfo renderingInfo{VK_STRUCTURE_TYPE_RENDERING_INFO};
     renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent.width = 1024 * 3;
-    renderingInfo.renderArea.extent.height = 1024 * 3;
+    renderingInfo.renderArea.extent.width = SHADOWMAP_SIZE;
+    renderingInfo.renderArea.extent.height = SHADOWMAP_SIZE;
     renderingInfo.layerCount = 1;
     renderingInfo.pDepthAttachment = &depthAttachment;
 
@@ -54,20 +55,20 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
 
     VkViewport vp{};
     vp.x = 0;
-    vp.y = 1024 * 3;
-    vp.width = 1024 * 3;
-    vp.height = -1024 * 3; // Flip viewport for Y up
+    vp.y = SHADOWMAP_SIZE;
+    vp.width = SHADOWMAP_SIZE;
+    vp.height = -static_cast<int32_t>(SHADOWMAP_SIZE); // Flip viewport for Y up
     vp.minDepth = 0.0f;
     vp.maxDepth = 1.0f;
 
     vkCmdSetViewport(*cmd, 0, 1, &vp);
 
     VkRect2D scissor{};
-    scissor.extent.width = 1024 * 3;
-    scissor.extent.height = 1024 * 3;
+    scissor.extent.width = SHADOWMAP_SIZE;
+    scissor.extent.height = SHADOWMAP_SIZE;
 
     vkCmdSetScissor(*cmd, 0, 1, &scissor);
-    vkCmdSetCullMode(*cmd, VK_CULL_MODE_BACK_BIT);
+    vkCmdSetCullMode(*cmd, VK_CULL_MODE_FRONT_BIT);
 
     if (m_models != nullptr) {
         for (auto &model : *m_models) {
@@ -77,7 +78,10 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
 
             LightConstants c;
             c.lightVP = m_lightVP;
-            c.model = model.worldTransform;
+            c.model = glm::translate(model.worldTransform,
+                                     glm::vec3(model.position.x,
+                                               model.position.y,
+                                               model.position.z));
 
             vkCmdPushConstants(*cmd,
                                m_pipelineLayout,
@@ -107,12 +111,18 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
     vkCmdEndDebugUtilsLabelEXT(*cmd);
 }
 
-void ShadowPass::setLightDirection(glm::vec3 lightPos)
+void ShadowPass::setLightDirection(glm::vec3 lightDir)
 {
-    m_lightPosition = lightPos;
+    m_lightDirection = lightDir;
 
-    glm::mat4 p = glm::orthoZO(-20.0, 20.0, -20.0, 20.0, 1.0, 7.5);
-    glm::mat4 v = glm::lookAt(glm::normalize(m_lightPosition) * 2.0f + 1.0f,
+    const glm::vec3 sceneCenter{0, 0, 0};
+    const double sceneRadius = 50.0;
+
+    glm::mat4 p
+        = glm::orthoZO(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 1.0, 2 * sceneRadius);
+    glm::mat4 v = glm::lookAt(sceneCenter
+                                  + glm::normalize(m_lightDirection)
+                                        * static_cast<float>(sceneRadius),
                               glm::vec3(0.0f, 0.0f, 0.0f),
                               glm::vec3(0.0f, 1.0f, 0.0f));
 

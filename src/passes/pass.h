@@ -31,6 +31,8 @@ public:
         }
     };
     inline void addDepth(Texture *depth) { m_depth = depth; };
+    // If depth is resized along with the swapchain
+    inline void setDepthResizable(bool flag) { m_resizeDepth = flag; }
     inline void attachModels(std::vector<NativeModel> *models) { m_models = models; }
     inline void attachImageResources(std::vector<Texture> *textures) { m_textures = textures; }
 
@@ -134,6 +136,7 @@ protected:
     Texture *m_depth = nullptr;
 
 private:
+    bool m_resizeDepth = true;
     bool m_isUsingEngineTargets = false;
 
     friend class Graphics;

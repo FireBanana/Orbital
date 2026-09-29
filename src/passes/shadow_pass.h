@@ -16,7 +16,7 @@ public:
 
     void render(VkCommandBuffer *cmd, uint32_t imageIndex) override;
 
-    void setLightDirection(glm::vec3 lightPos);
+    void setLightDirection(glm::vec3 lightDir);
 
     const Texture *getShadowMap() const;
     glm::mat4 getLightVPMatrix() const;
@@ -29,8 +29,10 @@ private:
     Texture *m_depthTex;
     Texture m_shadowMap;
 
-    glm::vec3 m_lightPosition;
+    glm::vec3 m_lightDirection;
     glm::mat4 m_lightVP;
+
+    constexpr static uint32_t SHADOWMAP_SIZE = 4096;
 };
 
 #endif // SHADOW_PASS_H

@@ -143,7 +143,7 @@ float4 main(VSOutput input) : SV_Target
 
     // shadows
     var lightSpacePos = input.LightSpacePos / input.LightSpacePos.w;
-    float shadow = texture0.SampleCmp(lightSpacePos.xy, lightSpacePos.z - 0.005);
+    float shadow = texture0.SampleCmp(lightSpacePos.xy, lightSpacePos.z);
     //
 
     var norm = input.Normal * normal.xyz;

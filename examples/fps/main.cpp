@@ -11,7 +11,7 @@ int main()
     std::vector<Pass *> passes{new ShadowPass{&g}, new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
-    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/sponza.glb");
+    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/bistro.glb");
     auto nmap = g.makeNativeModel(map);
 
     std::vector<NativeModel> models{nmap};
@@ -21,14 +21,9 @@ int main()
 
     const auto *shadowMap = sPass->getShadowMap();
 
-    //glm::vec3 light{0, 5, 0};
-
     sPass->attachModels(&models);
-    //sPass->setLightPosition(light);
     fPass->attachModels(&models);
     fPass->setShadowMap(shadowMap);
-    //fPass->setLightVPMatrix(sPass->getLightVPMatrix());
-    //fPass->setLightPosition(light);
 
     bool isPressed;
     bool newClick;
@@ -91,7 +86,7 @@ int main()
     });
 
     g.beginRenderLoop(passes, cPasses, [&sPass, &fPass](double time, double deltaTime) {
-        glm::vec3 lp(glm::sin(time * 0.001), glm::cos(time * 0.001), 0.);
+        glm::vec3 lp(glm::sin(time * 0.001), 0.3, glm::cos(time * 0.001));
 
         sPass->setLightDirection(lp);
         fPass->setLightVPMatrix(sPass->getLightVPMatrix());

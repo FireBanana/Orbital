@@ -629,7 +629,7 @@ void Graphics::recreateSwapchain(std::vector<Pass *> &graphicPasses)
             // Resize color targets here
         }
 
-        if (p->m_depth != nullptr) {
+        if (p->m_depth != nullptr && p->m_resizeDepth) {
             vkDestroyImageView(Global::g_device, p->m_depth->view, nullptr);
             vkDestroyImage(Global::g_device, p->m_depth->image, nullptr);
             //vkFreeMemory(Global::g_device, p->m_depth->memory, nullptr);
