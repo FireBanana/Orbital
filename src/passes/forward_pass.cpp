@@ -1,6 +1,6 @@
+#include "forward_pass.h"
 #include "../global.h"
 #include "../graphics.h"
-#include "forward_pass.h"
 #include <iostream>
 
 ForwardPass::ForwardPass(Graphics *graphics)
@@ -126,7 +126,15 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
                                           0.1f,
                                           1000.0f);
 
-        m_view = glm::lookAt(m_cameraPosition, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+        glm::vec3 front;
+        front.x = cos(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
+        front.y = sin(glm::radians(m_pitch));
+        front.z = sin(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
+
+        glm::vec3 right = glm::normalize(glm::cross(front, {0, 1, 0}));
+        glm::vec3 up = glm::cross(right, front);
+
+        m_view = glm::lookAt(m_cameraPosition, m_cameraPosition + front, up);
         m_constants = {m_view,
                        m_projection,
                        m_lightVP,
@@ -274,6 +282,17 @@ void ForwardPass::setLightVPMatrix(glm::mat4 lightVP)
 void ForwardPass::setCameraPosition(glm::vec3 position)
 {
     m_cameraPosition = position;
+}
+
+void ForwardPass::translateCamera(glm::vec3 position)
+{
+    m_cameraPosition += position;
+}
+
+void ForwardPass::rotateCamera(float yaw, float pitch)
+{
+    m_yaw += yaw;
+    m_pitch += pitch;
 }
 
 void ForwardPass::setLightDirection(glm::vec3 lightPos)

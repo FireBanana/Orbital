@@ -165,8 +165,8 @@ float4 main(VSOutput input) : SV_Target
     col = col / (col + 1.);
     col = pow(col, 1/2.2);
 
-    col *= shadow;
+    col *= saturate(shadow + 0.3); //some ambient
 
-    //return float4(shadow);
+    return color;
     return float4(col, 1.);
 }
