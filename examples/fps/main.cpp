@@ -4,6 +4,12 @@
 #include <passes/gui_pass.h>
 #include <passes/shadow_pass.h>
 
+struct Move
+{
+    float forward = 0.0f;
+    float side = 0.0f;
+};
+
 class CharacterController
 {
 public:
@@ -12,6 +18,10 @@ public:
 
     void move(glm::vec3 translation) { pass->translateCamera(translation); }
     void rotate(float yaw, float pitch) { pass->rotateCamera(yaw, pitch); }
+    void update(Move m, float deltaTime)
+    {
+        move({m.side * deltaTime * 0.001, 0, m.forward * deltaTime * 0.001});
+    }
 
 private:
     ForwardPass *pass;
@@ -26,7 +36,7 @@ int main()
     std::vector<Pass *> passes{new ShadowPass{&g}, new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
-    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/helmet.glb");
+    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/sponza.glb");
     auto nmap = g.makeNativeModel(map);
 
     std::vector<NativeModel> models{nmap};
@@ -99,16 +109,44 @@ int main()
                           cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
         });
 
-    std::atomic<bool> move = false;
+    std::atomic<Move> move;
 
     w.registerKey([&fPass, &move](int key, int scancode, int action, int mods) {
-        if (key == GLFW_KEY_W) {
-            if (action == GLFW_PRESS) {
-                move = true;
-            } else if (action == GLFW_RELEASE) {
-                move = false;
+        if (action == GLFW_PRESS) {
+            auto m = move.load();
+
+            if (key == GLFW_KEY_W) {
+                m.forward = 1.0f;
+            } else if (key == GLFW_KEY_S) {
+                m.forward = -1.0f;
             }
-        } else if (key == GLFW_KEY_ESCAPE)
+
+            if (key == GLFW_KEY_A) {
+                m.side = -1.0f;
+            } else if (key == GLFW_KEY_D) {
+                m.side = 1.0f;
+            }
+
+            move.store(m);
+        } else if (action == GLFW_RELEASE) {
+            auto m = move.load();
+
+            if (key == GLFW_KEY_W) {
+                m.forward = 0.0f;
+            } else if (key == GLFW_KEY_S) {
+                m.forward = 0.0f;
+            }
+
+            if (key == GLFW_KEY_A) {
+                m.side = 0.0f;
+            } else if (key == GLFW_KEY_D) {
+                m.side = 05.0f;
+            }
+
+            move.store(m);
+        }
+
+        if (key == GLFW_KEY_ESCAPE)
             glfwSetInputMode(Global::g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     });
 
@@ -125,9 +163,7 @@ int main()
                       [&sPass, &fPass, &move, &controller](double time, double deltaTime) {
                           glm::vec3 lp(glm::sin(time * 0.0001), 0.3, glm::cos(time * 0.0001));
 
-                          if (move) {
-                              controller.move({0, 0, 0.001 * deltaTime});
-                          }
+                          controller.update(move, deltaTime);
 
                           sPass->setLightDirection(lp);
                           fPass->setLightVPMatrix(sPass->getLightVPMatrix());

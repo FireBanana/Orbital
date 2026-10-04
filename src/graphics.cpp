@@ -565,9 +565,30 @@ void Graphics::makeSwapchain()
     }
 
     m_swapchainCount = surfaceProperties.minImageCount;
-    Global::g_frame_data.resize(m_swapchainCount);
 
-    makeRenderTarget(isRecreate);
+    // Support for present modes
+    uint32_t presentModeCount;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(Global::g_physical_device,
+                                              Global::g_surface,
+                                              &presentModeCount,
+                                              nullptr);
+    std::vector<VkPresentModeKHR> presentModes{presentModeCount};
+    vkGetPhysicalDeviceSurfacePresentModesKHR(Global::g_physical_device,
+                                              Global::g_surface,
+                                              &presentModeCount,
+                                              presentModes.data());
+
+    // Use mailbox if available, otherwise immediate
+    VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    for (auto mode : presentModes) {
+        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            break;
+        } else if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR
+                   && presentMode != VK_PRESENT_MODE_MAILBOX_KHR) {
+            presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+        }
+    }
 
     VkSwapchainCreateInfoKHR info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
     info.surface = Global::g_surface;
@@ -580,7 +601,7 @@ void Graphics::makeSwapchain()
     info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.preTransform
         = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR; // Not optimal on devices that support rotation
-    info.presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+    info.presentMode = presentMode;
     info.compositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
     info.clipped = true;
     info.oldSwapchain = oldSwapchain;
@@ -598,6 +619,10 @@ void Graphics::makeSwapchain()
                             Global::g_swapchain,
                             &imgCount,
                             Global::g_swapchain_images.data());
+
+    m_swapchainCount = imgCount;
+    Global::g_frame_data.resize(m_swapchainCount);
+    makeRenderTarget(isRecreate);
 
     if (!isRecreate)
         for (int i = 0; i < imgCount; ++i)

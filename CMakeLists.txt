@@ -142,7 +142,8 @@ set(SOURCES
         src/passes/pass.h
         src/passes/forward_pass.h src/passes/forward_pass.cpp
         src/passes/gui_pass.h src/passes/gui_pass.cpp
-        src/passes/shadow_pass.h src/passes/shadow_pass.cpp)
+        src/passes/shadow_pass.h src/passes/shadow_pass.cpp
+        src/ecs/ecs.h)
 
 add_library(Orbital ${SOURCES})
 
