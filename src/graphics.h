@@ -20,7 +20,6 @@ struct Frame
 {
     VkFence fence;
     VkSemaphore acquireSemaphore;
-    VkSemaphore releaseSemaphore;
     VkCommandPool pool;
     VkCommandBuffer buffer;
 };
@@ -136,13 +135,12 @@ private:
 
     void initPerFrame(int index);
 
-    void render(uint32_t img,
+    void render(uint32_t frameIndex,
+                uint32_t imgIndex,
                 std::vector<Pass *> graphicsPasses,
                 std::vector<Pass *> computePasses);
 
     VkResult presentImage(uint32_t index);
-
-    VkResult acquireSwapchainImage(uint32_t *img);
 
     Window *m_window;
     VkExtent2D m_swapchainSize{0, 0};

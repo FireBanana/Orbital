@@ -325,6 +325,12 @@ void Graphics::initPerFrame(int index)
         std::cout << "buffer made" << std::endl;
     else
         std::cout << "buffer failed" << std::endl;
+
+    VkSemaphoreCreateInfo sinfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    vkCreateSemaphore(Global::g_device,
+                      &sinfo,
+                      nullptr,
+                      &Global::g_frame_data[index].acquireSemaphore);
 }
 
 Texture Graphics::makeImage(TextureDescription desc, Image *image)
@@ -485,28 +491,18 @@ Texture Graphics::makeImage(TextureDescription desc, Image *image)
 
 void Graphics::makeRenderTarget(bool isRecreate)
 {
-    if (isRecreate) {
-        for (auto i = 0; i < m_swapchainCount; ++i) {
-            vkDestroyImage(Global::g_device, Global::g_render_targets[i].image, nullptr);
-            vkDestroyImageView(Global::g_device, Global::g_render_targets[i].view, nullptr);
-            //vkFreeMemory(Global::g_device, Global::g_render_targets[i].memory, nullptr);
-            vmaFreeMemory(Global::g_allocator, Global::g_render_targets[i].memory);
+    for (auto &rt : Global::g_render_targets) {
+        if (isRecreate) {
+            vkDestroyImageView(Global::g_device, rt.view, nullptr);
+            vkDestroyImage(Global::g_device, rt.image, nullptr);
+            vmaFreeMemory(Global::g_allocator, rt.memory);
         }
-
-        Global::g_render_targets.clear();
-    } else if (Global::g_render_targets.size() != 0) {
-        std::cout << "Error, swapchain images being created without swapchain recreation!";
-    }
-
-    for (auto i = 0; i < m_swapchainCount; ++i) {
-        auto target = makeImage({m_swapchainSize.width,
-                                 m_swapchainSize.height,
-                                 Global::RENDER_TARGET_FORMAT,
-                                 VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
-                                     | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                                 VK_IMAGE_ASPECT_COLOR_BIT});
-
-        Global::g_render_targets.push_back(std::move(target));
+        rt = makeImage({m_swapchainSize.width,
+                        m_swapchainSize.height,
+                        Global::RENDER_TARGET_FORMAT,
+                        VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+                            | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+                        VK_IMAGE_ASPECT_COLOR_BIT});
     }
 }
 
@@ -583,10 +579,12 @@ void Graphics::makeSwapchain()
     for (auto mode : presentModes) {
         if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
             presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
+            std::cout << "Selected present mode is Mailbox" << std::endl;
             break;
         } else if (mode == VK_PRESENT_MODE_IMMEDIATE_KHR
                    && presentMode != VK_PRESENT_MODE_MAILBOX_KHR) {
             presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+            std::cout << "Selected present mode is Immediate" << std::endl;
         }
     }
 
@@ -621,12 +619,20 @@ void Graphics::makeSwapchain()
                             Global::g_swapchain_images.data());
 
     m_swapchainCount = imgCount;
-    Global::g_frame_data.resize(m_swapchainCount);
-    makeRenderTarget(isRecreate);
 
-    if (!isRecreate)
-        for (int i = 0; i < imgCount; ++i)
-            initPerFrame(i);
+    // Destroy semaphores
+    for (auto i = 0; i < Global::g_present_semaphores.size(); ++i) {
+        vkDestroySemaphore(Global::g_device, Global::g_present_semaphores[i], nullptr);
+    }
+
+    // Create present semaphores
+    Global::g_present_semaphores.resize(m_swapchainCount);
+    for (auto i = 0; i < Global::g_present_semaphores.size(); ++i) {
+        VkSemaphoreCreateInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        vkCreateSemaphore(Global::g_device, &info, nullptr, &Global::g_present_semaphores[i]);
+    }
+
+    makeRenderTarget(isRecreate);
 
     for (auto i = 0; i < imgCount; ++i) {
         if (isRecreate)
@@ -738,11 +744,12 @@ void Graphics::transitionBuffer(VkCommandBuffer cmd,
 }
 
 // Texture target for each swapchain image and 1 depth texture by default
-void Graphics::render(uint32_t img,
+void Graphics::render(uint32_t frameIndex,
+                      uint32_t imgIndex,
                       std::vector<Pass *> graphicsPasses,
                       std::vector<Pass *> computePasses)
 {
-    auto cmd = Global::g_frame_data[img].buffer;
+    auto cmd = Global::g_frame_data[frameIndex].buffer;
 
     VkCommandBufferBeginInfo beginInfo{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -751,7 +758,7 @@ void Graphics::render(uint32_t img,
 
     // Transition targets to color attachment
     transitionImageLayout(cmd,
-                          Global::g_render_targets[img].image,
+                          Global::g_render_targets[frameIndex].image,
                           VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                           VK_IMAGE_ASPECT_COLOR_BIT,
@@ -766,7 +773,7 @@ void Graphics::render(uint32_t img,
     clearValue.color = {{0, 0, 0, 0}};
 
     VkRenderingAttachmentInfo clearAttachment{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    clearAttachment.imageView = Global::g_render_targets[img].view;
+    clearAttachment.imageView = Global::g_render_targets[frameIndex].view;
     clearAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     clearAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     clearAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -784,11 +791,11 @@ void Graphics::render(uint32_t img,
 
     // Graphic Passes
     for (auto &pass : graphicsPasses)
-        pass->render(&cmd, img);
+        pass->render(&cmd, frameIndex);
 
     // Transition swapchain to storage
     transitionImageLayout(cmd,
-                          Global::g_render_targets[img].image,
+                          Global::g_render_targets[frameIndex].image,
                           VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                           VK_IMAGE_LAYOUT_GENERAL,
                           VK_IMAGE_ASPECT_COLOR_BIT,
@@ -798,14 +805,14 @@ void Graphics::render(uint32_t img,
                           VK_PIPELINE_STAGE_2_COMPUTE_SHADER_BIT);
 
     // Compute Passes
-    std::vector<Texture> res{{.view = Global::g_render_targets[img].view}};
+    std::vector<Texture> res{{.view = Global::g_render_targets[frameIndex].view}};
     for (auto &pass : computePasses) {
         pass->attachImageResources(&res);
-        pass->render(&cmd, img);
+        pass->render(&cmd, frameIndex);
     }
 
     transitionImageLayout(cmd,
-                          Global::g_render_targets[img].image,
+                          Global::g_render_targets[frameIndex].image,
                           VK_IMAGE_LAYOUT_GENERAL,
                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                           VK_IMAGE_ASPECT_COLOR_BIT,
@@ -835,15 +842,15 @@ void Graphics::render(uint32_t img,
     blitRegion.dstSubresource.mipLevel = 0;
 
     VkBlitImageInfo2 blitInfo{VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2};
-    blitInfo.srcImage = Global::g_render_targets[img].image;
-    blitInfo.dstImage = Global::g_swapchain_images[img];
+    blitInfo.srcImage = Global::g_render_targets[frameIndex].image;
+    blitInfo.dstImage = Global::g_swapchain_images[imgIndex];
     blitInfo.srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     blitInfo.dstImageLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     blitInfo.regionCount = 1;
     blitInfo.pRegions = &blitRegion;
 
     transitionImageLayout(cmd,
-                          Global::g_swapchain_images[img],
+                          Global::g_swapchain_images[imgIndex],
                           VK_IMAGE_LAYOUT_UNDEFINED,
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           VK_IMAGE_ASPECT_COLOR_BIT,
@@ -855,7 +862,7 @@ void Graphics::render(uint32_t img,
     vkCmdBlitImage2(cmd, &blitInfo);
 
     transitionImageLayout(cmd,
-                          Global::g_swapchain_images[img],
+                          Global::g_swapchain_images[imgIndex],
                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                           VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                           VK_IMAGE_ASPECT_COLOR_BIT,
@@ -866,30 +873,22 @@ void Graphics::render(uint32_t img,
 
     vkEndCommandBuffer(cmd);
 
-    if (Global::g_frame_data[img].releaseSemaphore == VK_NULL_HANDLE) {
-        VkSemaphoreCreateInfo semInfo{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        vkCreateSemaphore(Global::g_device,
-                          &semInfo,
-                          nullptr,
-                          &Global::g_frame_data[img].releaseSemaphore);
-    }
-
     VkPipelineStageFlags waitStage{VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT};
 
     VkSubmitInfo subInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
     subInfo.waitSemaphoreCount = 1;
-    subInfo.pWaitSemaphores = &Global::g_frame_data[img].acquireSemaphore;
+    subInfo.pWaitSemaphores = &Global::g_frame_data[frameIndex].acquireSemaphore;
     subInfo.pWaitDstStageMask = &waitStage;
     subInfo.commandBufferCount = 1;
     subInfo.pCommandBuffers = &cmd;
     subInfo.signalSemaphoreCount = 1;
-    subInfo.pSignalSemaphores = &Global::g_frame_data[img].releaseSemaphore;
+    subInfo.pSignalSemaphores = &Global::g_present_semaphores[imgIndex];
 
-    vkQueueSubmit(Global::g_queue, 1, &subInfo, Global::g_frame_data[img].fence);
+    vkQueueSubmit(Global::g_queue, 1, &subInfo, Global::g_frame_data[frameIndex].fence);
 
     // Readback data
     for (auto &pass : computePasses) {
-        pass->read(img);
+        pass->read(frameIndex);
     }
 }
 
@@ -897,53 +896,12 @@ VkResult Graphics::presentImage(uint32_t index)
 {
     VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
     present.waitSemaphoreCount = 1;
-    present.pWaitSemaphores = &Global::g_frame_data[index].releaseSemaphore;
+    present.pWaitSemaphores = &Global::g_present_semaphores[index];
     present.swapchainCount = 1;
     present.pSwapchains = &Global::g_swapchain;
     present.pImageIndices = &index;
 
     return vkQueuePresentKHR(Global::g_queue, &present);
-}
-
-VkResult Graphics::acquireSwapchainImage(uint32_t *img)
-{
-    VkSemaphore semaphore;
-
-    if (Global::g_semaphores.empty()) {
-        VkSemaphoreCreateInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        vkCreateSemaphore(Global::g_device, &info, nullptr, &semaphore);
-    } else {
-        semaphore = Global::g_semaphores.back();
-        Global::g_semaphores.pop_back();
-    }
-
-    auto res = vkAcquireNextImageKHR(Global::g_device,
-                                     Global::g_swapchain,
-                                     UINT64_MAX,
-                                     semaphore,
-                                     VK_NULL_HANDLE,
-                                     img);
-
-    if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
-        Global::g_semaphores.push_back(semaphore);
-        return res;
-    }
-
-    if (Global::g_frame_data[*img].fence != VK_NULL_HANDLE) {
-        vkWaitForFences(Global::g_device, 1, &Global::g_frame_data[*img].fence, true, UINT64_MAX);
-        vkResetFences(Global::g_device, 1, &Global::g_frame_data[*img].fence);
-    }
-
-    if (Global::g_frame_data[*img].pool != VK_NULL_HANDLE) {
-        vkResetCommandPool(Global::g_device, Global::g_frame_data[*img].pool, 0);
-    }
-
-    auto usedSemaphore = Global::g_frame_data[*img].acquireSemaphore;
-    if (usedSemaphore != VK_NULL_HANDLE)
-        Global::g_semaphores.push_back(usedSemaphore);
-    Global::g_frame_data[*img].acquireSemaphore = semaphore;
-
-    return res;
 }
 
 std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
@@ -1004,27 +962,47 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
                                std::function<void(double time, double deltaTime)> updateFn)
 {
     Global::g_gui_thread = std::thread([&]() {
+        // Create per frame data
+        for (int i = 0; i < Global::FRAMES_IN_FLIGHT; ++i)
+            initPerFrame(i);
+
+        uint32_t frameIndex = 0;
+
         while (!glfwWindowShouldClose(Global::g_window)) {
+            vkWaitForFences(Global::g_device,
+                            1,
+                            &Global::g_frame_data[frameIndex].fence,
+                            true,
+                            UINT64_MAX);
+            vkResetCommandPool(Global::g_device, Global::g_frame_data[frameIndex].pool, 0);
+
             if (Global::g_swapchain_dirty)
                 recreateSwapchain(graphicsPasses);
 
-            uint32_t frame;
-
-            auto r = acquireSwapchainImage(&frame);
+            uint32_t imageIndex = 0;
+            auto acquireSemaphore = Global::g_frame_data[frameIndex].acquireSemaphore;
+            auto r = vkAcquireNextImageKHR(Global::g_device,
+                                           Global::g_swapchain,
+                                           UINT64_MAX,
+                                           acquireSemaphore,
+                                           VK_NULL_HANDLE,
+                                           &imageIndex);
 
             if (r == VK_ERROR_OUT_OF_DATE_KHR) {
-                //vkQueueWaitIdle(Global::g_queue);
                 recreateSwapchain(graphicsPasses);
                 continue;
             }
 
-            render(frame, graphicsPasses, computePasses);
-            r = presentImage(frame);
+            vkResetFences(Global::g_device, 1, &Global::g_frame_data[frameIndex].fence);
+
+            render(frameIndex, imageIndex, graphicsPasses, computePasses);
+            presentImage(imageIndex);
 
             if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR)
                 recreateSwapchain(graphicsPasses);
 
             glfwPollEvents();
+            frameIndex = (frameIndex + 1) % Global::FRAMES_IN_FLIGHT;
         }
 
         Global::g_window_running = false;

@@ -20,7 +20,7 @@ public:
     {}
 
     // If nothing is passed then default engine attachments are set
-    inline void addAttachments(std::vector<Texture> *attachments = nullptr)
+    inline void addAttachments(std::array<Texture, Global::FRAMES_IN_FLIGHT> *attachments = nullptr)
     {
         if (!attachments) {
             m_attachments = &Global::g_render_targets;
@@ -130,7 +130,7 @@ protected:
     std::unordered_map<SamplerType, VkSampler> m_samplers;
     std::vector<NativeModel> *m_models = nullptr;
     std::vector<Texture> *m_textures = nullptr;
-    std::vector<Texture> *m_attachments = nullptr;
+    std::array<Texture, Global::FRAMES_IN_FLIGHT> *m_attachments = nullptr;
     std::vector<ImageDescriptorInfo> m_descriptorImageLayoutbindings;
     std::vector<VkDescriptorSetLayoutBinding> m_descriptorBufferLayoutBindings;
     Texture *m_depth = nullptr;

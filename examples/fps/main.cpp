@@ -36,7 +36,7 @@ int main()
     std::vector<Pass *> passes{new ShadowPass{&g}, new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
-    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/sponza.glb");
+    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/helmet.glb");
     auto nmap = g.makeNativeModel(map);
 
     std::vector<NativeModel> models{nmap};
@@ -140,7 +140,7 @@ int main()
             if (key == GLFW_KEY_A) {
                 m.side = 0.0f;
             } else if (key == GLFW_KEY_D) {
-                m.side = 05.0f;
+                m.side = 0.0f;
             }
 
             move.store(m);
