@@ -158,15 +158,15 @@ int main()
             m.roughness = roughness;
     });
 
-    g.beginRenderLoop(passes,
-                      cPasses,
-                      [&sPass, &fPass, &move, &controller](double time, double deltaTime) {
-                          glm::vec3 lp(glm::sin(time * 0.0001), 0.3, glm::cos(time * 0.0001));
+    g.beginRenderLoopSingle(passes,
+                            cPasses,
+                            [&sPass, &fPass, &move, &controller](double time, double deltaTime) {
+                                glm::vec3 lp(glm::sin(time * 0.0001), 0.3, glm::cos(time * 0.0001));
 
-                          controller.update(move, deltaTime);
+                                controller.update(move, deltaTime);
 
-                          sPass->setLightDirection(lp);
-                          fPass->setLightVPMatrix(sPass->getLightVPMatrix());
-                          fPass->setLightDirection(lp);
-                      });
+                                sPass->setLightDirection(lp);
+                                fPass->setLightVPMatrix(sPass->getLightVPMatrix());
+                                fPass->setLightDirection(lp);
+                            });
 }

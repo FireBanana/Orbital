@@ -955,8 +955,8 @@ std::vector<NativeModel> Graphics::makeNativeModel(Model &model)
     return result;
 }
 
-// TODO: Currently unsynced double threaded. Add job system and sync for
-// parallel, and single threaded option as well
+// TODO: Currently unused unsynced double threaded. Add job system and sync for
+// parallel, meanwhile single threaded is used
 void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
                                std::vector<Pass *> &computePasses,
                                std::function<void(double time, double deltaTime)> updateFn)
@@ -1001,7 +1001,6 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
             if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR)
                 recreateSwapchain(graphicsPasses);
 
-            glfwPollEvents();
             frameIndex = (frameIndex + 1) % Global::FRAMES_IN_FLIGHT;
         }
 
@@ -1035,10 +1034,72 @@ void Graphics::beginRenderLoop(std::vector<Pass *> &graphicsPasses,
         }
 
         frame++;
+        glfwPollEvents();
         std::this_thread::sleep_for(std::chrono::duration<double, std::milli>(dt));
     }
 
     Global::g_gui_thread.join();
+}
+
+void Graphics::beginRenderLoopSingle(std::vector<Pass *> &graphicsPasses,
+                                     std::vector<Pass *> &computePasses,
+                                     std::function<void(double time, double deltaTime)> updateFn)
+{
+    uint64_t frame = 0;
+    double dt = 1000 / 60.0;
+    auto currTime = std::chrono::steady_clock::now();
+    double accumulator = 0.0;
+    uint32_t frameIndex = 0;
+
+    for (int i = 0; i < Global::FRAMES_IN_FLIGHT; ++i)
+        initPerFrame(i);
+
+    while (!glfwWindowShouldClose(Global::g_window)) {
+        vkWaitForFences(Global::g_device,
+                        1,
+                        &Global::g_frame_data[frameIndex].fence,
+                        true,
+                        UINT64_MAX);
+        vkResetCommandPool(Global::g_device, Global::g_frame_data[frameIndex].pool, 0);
+
+        glfwPollEvents();
+
+        auto newTime = std::chrono::steady_clock::now();
+        auto frameTime = std::chrono::duration<double, std::milli>(newTime - currTime).count();
+        currTime = newTime;
+
+        //processing
+        updateFn(std::chrono::duration<double, std::milli>(currTime.time_since_epoch()).count(),
+                 frameTime);
+
+        if (Global::g_swapchain_dirty)
+            recreateSwapchain(graphicsPasses);
+
+        uint32_t imageIndex = 0;
+        auto acquireSemaphore = Global::g_frame_data[frameIndex].acquireSemaphore;
+        auto r = vkAcquireNextImageKHR(Global::g_device,
+                                       Global::g_swapchain,
+                                       UINT64_MAX,
+                                       acquireSemaphore,
+                                       VK_NULL_HANDLE,
+                                       &imageIndex);
+
+        if (r == VK_ERROR_OUT_OF_DATE_KHR) {
+            recreateSwapchain(graphicsPasses);
+            continue;
+        }
+
+        vkResetFences(Global::g_device, 1, &Global::g_frame_data[frameIndex].fence);
+
+        render(frameIndex, imageIndex, graphicsPasses, computePasses);
+        presentImage(imageIndex);
+
+        if (r == VK_ERROR_OUT_OF_DATE_KHR || r == VK_SUBOPTIMAL_KHR)
+            recreateSwapchain(graphicsPasses);
+
+        frameIndex = (frameIndex + 1) % Global::FRAMES_IN_FLIGHT;
+        frame++;
+    }
 }
 
 VkExtent2D Graphics::getSwapchainSize() const

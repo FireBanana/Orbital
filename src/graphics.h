@@ -113,6 +113,10 @@ public:
                          std::vector<Pass *> &computePasses,
                          std::function<void(double time, double deltaTime)> updateFn);
 
+    void beginRenderLoopSingle(std::vector<Pass *> &graphicsPasses,
+                               std::vector<Pass *> &computePasses,
+                               std::function<void(double time, double deltaTime)> updateFn);
+
     VkExtent2D getSwapchainSize() const;
     uint32_t getSwapchainCount() const;
 
