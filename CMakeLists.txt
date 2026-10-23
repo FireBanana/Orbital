@@ -36,7 +36,7 @@ FetchContent_MakeAvailable(vma)
 FetchContent_Declare(
     fastgltf
     GIT_REPOSITORY https://github.com/spnda/fastgltf.git
-    GIT_TAG main
+    GIT_TAG v0.9.1
 )
 FetchContent_MakeAvailable(fastgltf)
 
