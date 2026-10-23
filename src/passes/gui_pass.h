@@ -14,11 +14,14 @@ public:
 
     void addSlider(std::string name, float min, float max, std::function<void(float)> valueChanged);
 
+    void insertUi(std::function<void()> fn);
+
 private:
     void createPipeline() override;
 
     std::vector<GuiRect> m_debugRects;
     std::vector<GuiSlider> m_sliders;
     std::vector<std::tuple<vec2, vec2>> m_debugLines;
+    std::vector<std::function<void()>> m_guiLayers;
 };
 #endif // GUI_PASS_H

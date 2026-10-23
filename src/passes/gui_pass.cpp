@@ -1,6 +1,6 @@
-#include "gui_pass.h"
 #include "../global.h"
 #include "../graphics.h"
+#include "gui_pass.h"
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 
@@ -85,6 +85,9 @@ void GuiPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
         drawList->AddLine({first.u, first.v}, {second.u, second.v}, IM_COL32(255, 255, 0, 255));
     }
 
+    for (auto &layer : m_guiLayers)
+        layer();
+
     ImGui::Render(); // finalizes draw data, does NOT touch Vulkan
 
     vkCmdBeginRendering(*cmd, &renderingInfo);
@@ -107,10 +110,8 @@ void GuiPass::drawDebugLines(std::tuple<vec2, vec2> line)
     m_debugLines.push_back(line);
 }
 
-void GuiPass::addSlider(std::string name,
-                        float min,
-                        float max,
-                        std::function<void(float)> valueChanged)
+void GuiPass::addSlider(
+    std::string name, float min, float max, std::function<void(float)> valueChanged)
 {
     m_sliders.push_back({name, min, max, (min + max) / 2.0f, valueChanged});
 }
@@ -118,4 +119,9 @@ void GuiPass::addSlider(std::string name,
 void GuiPass::createPipeline()
 {
     // Imgui makes its own pipeline
+}
+
+void GuiPass::insertUi(std::function<void()> fn)
+{
+    m_guiLayers.push_back(fn);
 }
