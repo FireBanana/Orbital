@@ -11,6 +11,10 @@ GuiPass::GuiPass(Graphics *graphics)
     // createPipeline();
 
     ImGui::CreateContext();
+
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
     ImGui_ImplGlfw_InitForVulkan(Global::g_window, true);
     ImGui_ImplVulkan_InitInfo init_info{};
     init_info.Instance = Global::g_instance;
