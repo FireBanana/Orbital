@@ -43,7 +43,7 @@ FetchContent_MakeAvailable(fastgltf)
 FetchContent_Declare(
     imgui
     GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG master
+    GIT_TAG docking
 )
 
 FetchContent_MakeAvailable(imgui)
@@ -143,7 +143,8 @@ set(SOURCES
         src/passes/forward_pass.h src/passes/forward_pass.cpp
         src/passes/gui_pass.h src/passes/gui_pass.cpp
         src/passes/shadow_pass.h src/passes/shadow_pass.cpp
-        src/ecs/ecs.h)
+        src/ecs/ecs.h
+        src/ecs/ecs.cpp)
 
 add_library(Orbital ${SOURCES})
 
