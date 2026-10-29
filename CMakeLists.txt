@@ -156,7 +156,7 @@ orbital_add_shaders(Orbital ${CMAKE_CURRENT_SOURCE_DIR}/shaders
 
 include(GNUInstallDirs)
 
-target_compile_definitions(Orbital PUBLIC ROOT="${CMAKE_SOURCE_DIR}/")
+target_compile_definitions(Orbital PUBLIC ROOT="${PROJECT_SOURCE_DIR}/")
 
 #target_include_directories(Orbital PRIVATE ${fastgltf_SOURCE_DIR})
 target_include_directories(Orbital PUBLIC "src/" "external/")
