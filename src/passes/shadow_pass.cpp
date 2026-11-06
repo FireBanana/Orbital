@@ -1,4 +1,5 @@
 #include "shadow_pass.h"
+#include "types.h"
 
 ShadowPass::ShadowPass(Graphics *g)
     : Pass{g}
@@ -40,15 +41,16 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
     renderingInfo.layerCount = 1;
     renderingInfo.pDepthAttachment = &depthAttachment;
 
-    m_graphics->transitionImageLayout(*cmd,
-                                      m_depth->image,
-                                      VK_IMAGE_LAYOUT_UNDEFINED,
-                                      VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                                      VK_IMAGE_ASPECT_DEPTH_BIT,
-                                      VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, // srcAccessMask
-                                      VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                                      VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, // srcStageMask
-                                      VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
+    m_graphics->transitionImageLayout(
+        *cmd,
+        m_depth->image,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT, // srcAccessMask
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT, // srcStageMask
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT);
 
     vkCmdBeginRendering(*cmd, &renderingInfo);
     vkCmdBindPipeline(*cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
@@ -70,43 +72,38 @@ void ShadowPass::render(VkCommandBuffer *cmd, uint32_t imageIndex)
     vkCmdSetScissor(*cmd, 0, 1, &scissor);
     vkCmdSetCullMode(*cmd, VK_CULL_MODE_FRONT_BIT);
 
-    if (m_models != nullptr) {
-        for (auto &model : *m_models) {
-            VkDeviceSize offset{0};
-            vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
-            vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
+    auto meshes = m_world->getAllEntitiesWith<MeshRenderer, Transform>();
+    for (auto [entity, mesh, tr] : meshes) {
+        auto &model = m_graphics->getNativeMesh(mesh->meshHandle);
 
-            LightConstants c;
-            c.lightVP = m_lightVP;
-            c.model = glm::translate(model.worldTransform,
-                                     glm::vec3(model.position.x,
-                                               model.position.y,
-                                               model.position.z));
+        VkDeviceSize offset{0};
+        vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
+        vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
 
-            vkCmdPushConstants(*cmd,
-                               m_pipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT,
-                               0,
-                               sizeof(LightConstants),
-                               &c);
+        LightConstants c;
+        c.lightVP = m_lightVP;
+        c.model = glm::translate(
+            model.worldTransform, glm::vec3(tr->position.x, tr->position.y, tr->position.z));
 
-            vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
-        }
+        vkCmdPushConstants(
+            *cmd, m_pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(LightConstants), &c);
+
+        vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
     }
 
     vkCmdEndRendering(*cmd);
 
-    m_graphics
-        ->transitionImageLayout(*cmd,
-                                m_depth->image,
-                                VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-                                VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
-                                VK_IMAGE_ASPECT_DEPTH_BIT,
-                                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
-                                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                                VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
-                                    | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
-                                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
+    m_graphics->transitionImageLayout(
+        *cmd,
+        m_depth->image,
+        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, // srcAccessMask
+        VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT
+            | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, // srcStageMask
+        VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT);
 
     vkCmdEndDebugUtilsLabelEXT(*cmd);
 }
@@ -120,11 +117,10 @@ void ShadowPass::setLightDirection(glm::vec3 lightDir)
 
     glm::mat4 p
         = glm::orthoZO(-sceneRadius, sceneRadius, -sceneRadius, sceneRadius, 1.0, 2 * sceneRadius);
-    glm::mat4 v = glm::lookAt(sceneCenter
-                                  + glm::normalize(m_lightDirection)
-                                        * static_cast<float>(sceneRadius),
-                              glm::vec3(0.0f, 0.0f, 0.0f),
-                              glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 v = glm::lookAt(
+        sceneCenter + glm::normalize(m_lightDirection) * static_cast<float>(sceneRadius),
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f));
 
     m_lightVP = p * v;
 }
@@ -197,9 +193,8 @@ void ShadowPass::createPipeline()
     rasterInfo.depthBiasSlopeFactor = 1.75f;
     rasterInfo.lineWidth = 1.0;
 
-    std::vector<VkDynamicState> dynamicStates = {VK_DYNAMIC_STATE_VIEWPORT,
-                                                 VK_DYNAMIC_STATE_SCISSOR,
-                                                 VK_DYNAMIC_STATE_CULL_MODE};
+    std::vector<VkDynamicState> dynamicStates
+        = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR, VK_DYNAMIC_STATE_CULL_MODE};
 
     // VkPipelineColorBlendAttachmentState blendAttachment{};
     // blendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT
@@ -233,8 +228,8 @@ void ShadowPass::createPipeline()
     std::array<VkPipelineShaderStageCreateInfo, 1> shaderStages = {
         {{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
           .stage = VK_SHADER_STAGE_VERTEX_BIT,
-          .module = m_graphics->getShaderModule(ROOT "shaders/shadow.vert.spv",
-                                                VK_SHADER_STAGE_VERTEX_BIT),
+          .module
+          = m_graphics->getShaderModule(ROOT "shaders/shadow.vert.spv", VK_SHADER_STAGE_VERTEX_BIT),
           .pName = "main"}}};
 
     VkPipelineRenderingCreateInfo renderingInfo{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};

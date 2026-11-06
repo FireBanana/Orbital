@@ -1,4 +1,5 @@
 #include "window.h"
+#include "world.h"
 #include <iostream>
 #include <passes/forward_pass.h>
 #include <passes/gui_pass.h>
@@ -32,22 +33,30 @@ int main()
 {
     Window w{};
     Graphics g{&w};
+    World world{};
 
     std::vector<Pass *> passes{new ShadowPass{&g}, new ForwardPass{&g}};
     std::vector<Pass *> cPasses{};
 
-    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/helmet.glb");
-    auto nmap = g.makeNativeModel(map);
+    auto map = AssetLoader::loadScene(ROOT "examples/fps/assets/testscene.glb");
+    auto models = g.makeNativeModel(map);
 
-    std::vector<NativeModel> models{nmap};
+    // std::vector<NativeModel> models{nmap};
 
     auto sPass = static_cast<ShadowPass *>(passes[0]);
     auto fPass = static_cast<ForwardPass *>(passes[1]);
 
     const auto *shadowMap = sPass->getShadowMap();
 
-    sPass->attachModels(&models);
-    fPass->attachModels(&models);
+    for (auto i = 0; i < models.size(); ++i) {
+        auto item = world.createEntity();
+        auto &renderer = world.addComponentToEntity<MeshRenderer>(item);
+        world.addComponentToEntity<Transform>(item);
+        renderer.meshHandle = models[i];
+    }
+
+    sPass->setWorld(&world);
+    fPass->setWorld(&world);
     fPass->setShadowMap(shadowMap);
 
     CharacterController controller{fPass};
@@ -69,44 +78,49 @@ int main()
         }
     });
 
-    w.registerMousePosition(
-        [&isPressed, &newClick, &xDelta, &yDelta, &cameraDistance, &fPass, &controller](double xp,
-                                                                                        double yp) {
-            xp *= 1.0;
-            yp *= -1.0;
-            static double lastXPosition = xp, lastYPosition = yp;
+    w.registerMousePosition([&isPressed,
+                             &newClick,
+                             &xDelta,
+                             &yDelta,
+                             &cameraDistance,
+                             &fPass,
+                             &controller](double xp, double yp) {
+        xp *= 1.0;
+        yp *= -1.0;
+        static double lastXPosition = xp, lastYPosition = yp;
 
-            // if (!isPressed)
-            //     return;
+        // if (!isPressed)
+        //     return;
 
-            // if (newClick) {
-            //     lastXPosition = xp;
-            //     lastYPosition = yp;
-            //     newClick = false;
-            // }
+        // if (newClick) {
+        //     lastXPosition = xp;
+        //     lastYPosition = yp;
+        //     newClick = false;
+        // }
 
-            xDelta = xp - lastXPosition;
-            yDelta = yp - lastYPosition;
+        xDelta = xp - lastXPosition;
+        yDelta = yp - lastYPosition;
 
-            // fPass->setCameraPosition(
-            //     glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
-            //               cameraDistance * (glm::sin(yDelta * 0.01)),
-            //               cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
+        // fPass->setCameraPosition(
+        //     glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+        //               cameraDistance * (glm::sin(yDelta * 0.01)),
+        //               cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
 
-            controller.rotate(xDelta * 0.01, yDelta * 0.01);
+        controller.rotate(xDelta * 0.01, yDelta * 0.01);
 
-            lastXPosition = xp;
-            lastYPosition = yp;
-        });
+        lastXPosition = xp;
+        lastYPosition = yp;
+    });
 
     w.registerMouseScroll(
         [&cameraDistance, &xDelta, &yDelta, &fPass](double xoffset, double yoffset) {
             cameraDistance -= yoffset * 0.2;
 
             fPass->setCameraPosition(
-                glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
-                          cameraDistance * (glm::sin(yDelta * 0.01)),
-                          cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
+                glm::vec3(
+                    cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+                    cameraDistance * (glm::sin(yDelta * 0.01)),
+                    cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
         });
 
     std::atomic<Move> move;
@@ -154,19 +168,18 @@ int main()
     passes.push_back(new GuiPass(&g));
     auto gPass = static_cast<GuiPass *>(passes[2]);
     gPass->addSlider("roughness", 0., 1., [&models](float roughness) {
-        for (auto &m : models)
-            m.roughness = roughness;
+        // for (auto &m : models)
+        //     m.roughness = roughness;
     });
 
-    g.beginRenderLoopSingle(passes,
-                            cPasses,
-                            [&sPass, &fPass, &move, &controller](double time, double deltaTime) {
-                                glm::vec3 lp(glm::sin(time * 0.0001), 0.3, glm::cos(time * 0.0001));
+    g.beginRenderLoopSingle(
+        passes, cPasses, [&sPass, &fPass, &move, &controller](double time, double deltaTime) {
+            glm::vec3 lp(glm::sin(time * 0.0001), 0.3, glm::cos(time * 0.0001));
 
-                                controller.update(move, deltaTime);
+            controller.update(move, deltaTime);
 
-                                sPass->setLightDirection(lp);
-                                fPass->setLightVPMatrix(sPass->getLightVPMatrix());
-                                fPass->setLightDirection(lp);
-                            });
+            sPass->setLightDirection(lp);
+            fPass->setLightVPMatrix(sPass->getLightVPMatrix());
+            fPass->setLightDirection(lp);
+        });
 }

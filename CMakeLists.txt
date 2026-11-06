@@ -48,6 +48,14 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(imgui)
 
+FetchContent_Declare(
+    entt
+    GIT_REPOSITORY https://github.com/skypjack/entt
+    GIT_TAG v4.0.0
+)
+
+FetchContent_MakeAvailable(entt)
+
 set(BOX2D_SAMPLES OFF CACHE BOOL "" FORCE)
 set(BOX2D_UNIT_TESTS OFF CACHE BOOL "" FORCE)
 set(BOX2D_BENCHMARKS OFF CACHE BOOL "" FORCE)
@@ -143,8 +151,7 @@ set(SOURCES
         src/passes/forward_pass.h src/passes/forward_pass.cpp
         src/passes/gui_pass.h src/passes/gui_pass.cpp
         src/passes/shadow_pass.h src/passes/shadow_pass.cpp
-        src/ecs/ecs.h
-        src/ecs/ecs.cpp)
+        src/world.h)
 
 add_library(Orbital ${SOURCES})
 
@@ -161,7 +168,7 @@ target_compile_definitions(Orbital PUBLIC ROOT="${PROJECT_SOURCE_DIR}/")
 #target_include_directories(Orbital PRIVATE ${fastgltf_SOURCE_DIR})
 target_include_directories(Orbital PUBLIC "src/" "external/")
 
-target_link_libraries(Orbital PUBLIC Vulkan::Vulkan glfw fastgltf::fastgltf imgui box2d box3d)
+target_link_libraries(Orbital PUBLIC Vulkan::Vulkan glfw fastgltf::fastgltf imgui box2d box3d EnTT::EnTT)
 
 add_subdirectory(examples)
 

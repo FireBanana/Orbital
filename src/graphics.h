@@ -73,9 +73,9 @@ struct NativeModel
     Buffer index;
     std::unordered_map<TextureType, Texture> textures;
     uint32_t indexCount;
-    vec3 position = {0, 0, 0};
+    // vec3 position = {0, 0, 0};
     glm::mat4 worldTransform = glm::mat4(1.0);
-    float roughness = 1.;
+    // float roughness = 1.;
 };
 
 class Graphics
@@ -88,7 +88,10 @@ public:
     Texture makeImage(TextureDescription desc, Image *image = nullptr);
 
     // A Model is a scene from blender, so can have many individual objects
-    std::vector<NativeModel> makeNativeModel(Model &model);
+    std::vector<uint32_t> makeNativeModel(Model &model);
+
+    // This will go invalid if the vector grows
+    NativeModel &getNativeMesh(uint32_t handle);
 
     VkShaderModule getShaderModule(const std::string path, VkShaderStageFlagBits bits);
 
@@ -149,6 +152,8 @@ private:
     Window *m_window;
     VkExtent2D m_swapchainSize{0, 0};
     uint32_t m_swapchainCount;
+
+    std::vector<NativeModel> m_nativeModelRegistry;
 };
 
 #endif // GRAPHICS_H

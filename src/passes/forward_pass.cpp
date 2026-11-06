@@ -119,12 +119,12 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     // Update uniform buffer
     {
-        m_projection = glm::perspectiveZO(glm::radians(60.0f),
-                                          static_cast<float>(m_graphics->getSwapchainSize().width)
-                                              / static_cast<float>(
-                                                  m_graphics->getSwapchainSize().height),
-                                          0.1f,
-                                          1000.0f);
+        m_projection = glm::perspectiveZO(
+            glm::radians(60.0f),
+            static_cast<float>(m_graphics->getSwapchainSize().width)
+                / static_cast<float>(m_graphics->getSwapchainSize().height),
+            0.1f,
+            1000.0f);
 
         glm::vec3 front;
         front.x = cos(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
@@ -135,133 +135,133 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
         glm::vec3 up = glm::cross(right, front);
 
         m_view = glm::lookAt(m_cameraPosition, m_cameraPosition + front, up);
-        m_constants = {m_view,
-                       m_projection,
-                       m_lightVP,
-                       glm::vec4(m_cameraPosition.x, m_cameraPosition.y, m_cameraPosition.z, 0),
-                       glm::vec4(m_lightPosition, 0.),
-                       0};
+        m_constants
+            = {m_view,
+               m_projection,
+               m_lightVP,
+               glm::vec4(m_cameraPosition.x, m_cameraPosition.y, m_cameraPosition.z, 0),
+               glm::vec4(m_lightPosition, 0.),
+               0};
 
         memcpy(m_uniformConstantBuffer.mappedData, &m_constants, sizeof(UniformConstants));
     }
 
     //forward pass
-    if (m_models != nullptr) {
-        int modelIndex = 0;
+    auto meshes = m_world->getAllEntitiesWith<MeshRenderer, Transform>();
+    int modelIndex = 0;
 
-        for (auto &model : *m_models) {
-            VkDeviceSize offset{0};
-            vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
-            vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
+    for (auto [entity, mesh, tr] : meshes) {
+        auto &model = m_graphics->getNativeMesh(mesh->meshHandle);
+        VkDeviceSize offset{0};
+        vkCmdBindVertexBuffers(*cmd, 0, 1, &model.vertex.buffer, &offset);
+        vkCmdBindIndexBuffer(*cmd, model.index.buffer, offset, VK_INDEX_TYPE_UINT32);
 
-            std::vector<VkDescriptorImageInfo> imageInfos{};
-            imageInfos.reserve(m_descriptorImageLayoutbindings.size());
-            std::vector<VkDescriptorBufferInfo> bufferInfos{};
-            bufferInfos.reserve(m_descriptorBufferLayoutBindings.size());
-            std::vector<VkWriteDescriptorSet> writeSets{};
-            writeSets.reserve(m_descriptorImageLayoutbindings.size()
-                              + m_descriptorBufferLayoutBindings.size());
+        std::vector<VkDescriptorImageInfo> imageInfos{};
+        imageInfos.reserve(m_descriptorImageLayoutbindings.size());
+        std::vector<VkDescriptorBufferInfo> bufferInfos{};
+        bufferInfos.reserve(m_descriptorBufferLayoutBindings.size());
+        std::vector<VkWriteDescriptorSet> writeSets{};
+        writeSets.reserve(
+            m_descriptorImageLayoutbindings.size() + m_descriptorBufferLayoutBindings.size());
 
-            // Add shadow map
-            {
-                VkDescriptorImageInfo imageInfo{};
-                imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = m_shadowMap->view;
-                imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
-                imageInfos.push_back(imageInfo);
+        // Add shadow map
+        {
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = m_shadowMap->view;
+            imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+            imageInfos.push_back(imageInfo);
 
-                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-                writeSet.dstBinding = shadowBinding.layoutBinding.binding;
-                writeSet.descriptorCount = 1;
-                writeSet.descriptorType = shadowBinding.layoutBinding.descriptorType;
-                writeSet.pImageInfo = &imageInfos.back();
-                writeSets.push_back(writeSet);
-            }
-
-            // Attach uniform buffer
-            {
-                VkDescriptorBufferInfo bufferInfo{};
-                bufferInfo.buffer = m_uniformConstantBuffer.buffer;
-                bufferInfo.offset = 0;
-                bufferInfo.range = sizeof(UniformConstants);
-                bufferInfos.push_back(bufferInfo);
-
-                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-                writeSet.dstBinding = uniformBinding.binding;
-                writeSet.descriptorCount = 1;
-                writeSet.descriptorType = uniformBinding.descriptorType;
-                writeSet.pBufferInfo = &bufferInfos.back();
-                writeSets.push_back(writeSet);
-            }
-
-            // Images
-            for (auto &layoutBinding : m_descriptorImageLayoutbindings) {
-                if (layoutBinding.textureType >= TextureType::Texture0)
-                    continue;
-
-                Texture tex = model.textures[layoutBinding.textureType];
-                VkDescriptorImageInfo imageInfo{};
-                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                imageInfo.imageView = model.textures[layoutBinding.textureType].view
-                                              == VK_NULL_HANDLE
-                                          ? m_placeholderTexture.view
-                                          : model.textures[layoutBinding.textureType].view;
-                imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
-                imageInfos.push_back(imageInfo);
-
-                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-                writeSet.dstBinding = layoutBinding.layoutBinding.binding;
-                writeSet.descriptorCount = 1;
-                writeSet.descriptorType = layoutBinding.layoutBinding.descriptorType;
-                writeSet.pImageInfo = &imageInfos.back();
-                writeSets.push_back(writeSet);
-            }
-
-            //Buffers
-            for (auto &layoutBinding : m_descriptorBufferLayoutBindings) {
-                if (layoutBinding.binding
-                    == 4) //Skipping the uniform buffer, have type like texture?
-                    continue;
-
-                VkDescriptorBufferInfo bufferInfo{};
-                //bufferInfo.buffer = m_uniformConstantBuffer.buffer;
-                //bufferInfo.offset = {0};
-                //bufferInfo.range = sizeof(UniformConstants);
-                bufferInfos.push_back(bufferInfo);
-
-                VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-                writeSet.dstBinding = layoutBinding.binding;
-                writeSet.descriptorCount = 1;
-                writeSet.descriptorType = layoutBinding.descriptorType;
-                writeSet.pBufferInfo = &bufferInfos.back();
-                writeSets.push_back(writeSet);
-            }
-
-            // Precompute this once as this is also being used in shadows
-            ModelConstants mc{glm::translate(model.worldTransform,
-                                             glm::vec3(model.position.x,
-                                                       model.position.y,
-                                                       model.position.z)),
-                              glm::vec4{model.roughness, 0., 0., 0.}};
-
-            vkCmdPushConstants(*cmd,
-                               m_pipelineLayout,
-                               VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                               0,
-                               sizeof(ModelConstants),
-                               &mc);
-
-            vkCmdPushDescriptorSet(*cmd,
-                                   VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                   m_pipelineLayout,
-                                   0,
-                                   writeSets.size(),
-                                   writeSets.data());
-
-            vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
-
-            modelIndex++;
+            VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writeSet.dstBinding = shadowBinding.layoutBinding.binding;
+            writeSet.descriptorCount = 1;
+            writeSet.descriptorType = shadowBinding.layoutBinding.descriptorType;
+            writeSet.pImageInfo = &imageInfos.back();
+            writeSets.push_back(writeSet);
         }
+
+        // Attach uniform buffer
+        {
+            VkDescriptorBufferInfo bufferInfo{};
+            bufferInfo.buffer = m_uniformConstantBuffer.buffer;
+            bufferInfo.offset = 0;
+            bufferInfo.range = sizeof(UniformConstants);
+            bufferInfos.push_back(bufferInfo);
+
+            VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writeSet.dstBinding = uniformBinding.binding;
+            writeSet.descriptorCount = 1;
+            writeSet.descriptorType = uniformBinding.descriptorType;
+            writeSet.pBufferInfo = &bufferInfos.back();
+            writeSets.push_back(writeSet);
+        }
+
+        // Images
+        for (auto &layoutBinding : m_descriptorImageLayoutbindings) {
+            if (layoutBinding.textureType >= TextureType::Texture0)
+                continue;
+
+            Texture tex = model.textures[layoutBinding.textureType];
+            VkDescriptorImageInfo imageInfo{};
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = model.textures[layoutBinding.textureType].view == VK_NULL_HANDLE
+                                      ? m_placeholderTexture.view
+                                      : model.textures[layoutBinding.textureType].view;
+            imageInfo.sampler = VK_NULL_HANDLE; // Sampler is ummutable
+            imageInfos.push_back(imageInfo);
+
+            VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writeSet.dstBinding = layoutBinding.layoutBinding.binding;
+            writeSet.descriptorCount = 1;
+            writeSet.descriptorType = layoutBinding.layoutBinding.descriptorType;
+            writeSet.pImageInfo = &imageInfos.back();
+            writeSets.push_back(writeSet);
+        }
+
+        //Buffers
+        for (auto &layoutBinding : m_descriptorBufferLayoutBindings) {
+            if (layoutBinding.binding == 4) //Skipping the uniform buffer, have type like texture?
+                continue;
+
+            VkDescriptorBufferInfo bufferInfo{};
+            //bufferInfo.buffer = m_uniformConstantBuffer.buffer;
+            //bufferInfo.offset = {0};
+            //bufferInfo.range = sizeof(UniformConstants);
+            bufferInfos.push_back(bufferInfo);
+
+            VkWriteDescriptorSet writeSet{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+            writeSet.dstBinding = layoutBinding.binding;
+            writeSet.descriptorCount = 1;
+            writeSet.descriptorType = layoutBinding.descriptorType;
+            writeSet.pBufferInfo = &bufferInfos.back();
+            writeSets.push_back(writeSet);
+        }
+
+        // Precompute this once as this is also being used in shadows
+        ModelConstants
+            mc{glm::translate(
+                   model.worldTransform, glm::vec3(tr->position.x, tr->position.y, tr->position.z)),
+               glm::vec4{mesh->roughness, 0., 0., 0.}};
+
+        vkCmdPushConstants(
+            *cmd,
+            m_pipelineLayout,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            0,
+            sizeof(ModelConstants),
+            &mc);
+
+        vkCmdPushDescriptorSet(
+            *cmd,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            m_pipelineLayout,
+            0,
+            writeSets.size(),
+            writeSets.data());
+
+        vkCmdDrawIndexed(*cmd, model.indexCount, 1, 0, 0, 0);
+
+        modelIndex++;
     }
 
     vkCmdEndRendering(*cmd);
@@ -431,15 +431,14 @@ void ForwardPass::createDescriptor()
     addImageDescriptor(0, SamplerType::Color, VK_SHADER_STAGE_FRAGMENT_BIT, TextureType::Diffuse);
     addImageDescriptor(1, SamplerType::Color, VK_SHADER_STAGE_FRAGMENT_BIT, TextureType::Normal);
 
-    addImageDescriptor(2,
-                       SamplerType::Color,
-                       VK_SHADER_STAGE_FRAGMENT_BIT,
-                       TextureType::MetallicRoughness);
+    addImageDescriptor(
+        2, SamplerType::Color, VK_SHADER_STAGE_FRAGMENT_BIT, TextureType::MetallicRoughness);
 
     // Depth texture
     addImageDescriptor(3, SamplerType::Depth, VK_SHADER_STAGE_FRAGMENT_BIT, TextureType::Texture0);
 
-    addBufferDescriptor(4,
-                        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    addBufferDescriptor(
+        4,
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 }

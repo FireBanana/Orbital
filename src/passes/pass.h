@@ -2,6 +2,7 @@
 #define PASS_H
 
 #include "../graphics.h"
+#include "world.h"
 #include "global.h"
 
 class Pass
@@ -33,7 +34,8 @@ public:
     inline void addDepth(Texture *depth) { m_depth = depth; };
     // If depth is resized along with the swapchain
     inline void setDepthResizable(bool flag) { m_resizeDepth = flag; }
-    inline void attachModels(std::vector<NativeModel> *models) { m_models = models; }
+    // inline void attachModels(std::vector<NativeModel> *models) { m_models = models; }
+    inline void setWorld(World *world) {m_world = world;}
     inline void attachImageResources(std::vector<Texture> *textures) { m_textures = textures; }
 
     inline void addImageDescriptor(uint32_t binding,
@@ -128,7 +130,8 @@ protected:
     VkPipelineLayout m_pipelineLayout;
     VkDescriptorSetLayout m_descriptorSetLayout;
     std::unordered_map<SamplerType, VkSampler> m_samplers;
-    std::vector<NativeModel> *m_models = nullptr;
+    // std::vector<NativeModel> *m_models = nullptr;
+    World *m_world;
     std::vector<Texture> *m_textures = nullptr;
     std::array<Texture, Global::FRAMES_IN_FLIGHT> *m_attachments = nullptr;
     std::vector<ImageDescriptorInfo> m_descriptorImageLayoutbindings;

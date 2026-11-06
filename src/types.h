@@ -84,4 +84,19 @@ struct Model
     std::vector<Mesh> meshes;
 };
 
+// Components
+
+struct Transform 
+{
+    vec3 position;
+    vec3 rotation;
+    vec3 scale {1,1,1};
+};
+
+struct MeshRenderer
+{
+    uint32_t meshHandle;
+    float roughness = 1.;
+};
+
 #endif // TYPES_H

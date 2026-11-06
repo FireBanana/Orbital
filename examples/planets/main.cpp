@@ -9,6 +9,7 @@ int main()
 {
     Window w{};
     Graphics graphics{&w};
+    World world{};
 
     // ===== Setup input ======
 
@@ -48,9 +49,10 @@ int main()
             yDelta = glm::clamp(yDelta, -130.0 + 0.01, 130.0 - 0.01);
 
             fPass.setCameraPosition(
-                glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
-                          cameraDistance * (glm::sin(yDelta * 0.01)),
-                          cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
+                glm::vec3(
+                    cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+                    cameraDistance * (glm::sin(yDelta * 0.01)),
+                    cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
 
             lastXPosition = xp;
             lastYPosition = yp;
@@ -61,9 +63,10 @@ int main()
             cameraDistance -= yoffset * 0.2;
 
             fPass.setCameraPosition(
-                glm::vec3(cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
-                          cameraDistance * (glm::sin(yDelta * 0.01)),
-                          cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
+                glm::vec3(
+                    cameraDistance * (glm::sin(xDelta * 0.01) * glm::cos(yDelta * 0.01)),
+                    cameraDistance * (glm::sin(yDelta * 0.01)),
+                    cameraDistance * (glm::cos(xDelta * 0.01) * glm::cos(yDelta * 0.01))));
         });
 
     // ===== Make Psses =======
@@ -79,16 +82,18 @@ int main()
     auto monkey = graphics.makeNativeModel(monkeyAsset);
     auto earth = graphics.makeNativeModel(earthAsset);
 
-    std::vector<NativeModel> renderables{50};
-
     for (int i = 0; i < 50; ++i) {
+        auto e = world.createEntity();
+        auto &m = world.addComponentToEntity<MeshRenderer>(e);
+        auto &t = world.addComponentToEntity<Transform>(e);
         if (i % 2 == 0)
-            renderables[i] = earth[i % earth.size()];
+            m.meshHandle = earth[i % earth.size()];
         else
-            renderables[i] = monkey[i % monkey.size()];
+            m.meshHandle = monkey[i % monkey.size()];
     }
 
-    fPass.attachModels(&renderables);
+    // fPass.attachModels(&renderables);
+    fPass.setWorld(&world);
 
     // ========================
     std::vector<Pass *> passes = {&fPass, &gPass};
@@ -106,7 +111,7 @@ int main()
         double speed;
     };
 
-    std::vector<GameObjectPlanet> gameObjects{renderables.size()};
+    std::vector<GameObjectPlanet> gameObjects{world.getTotalEntitySize()};
 
     double totalDistance = 0.0;
 
@@ -117,14 +122,13 @@ int main()
         totalDistance = gameObjects[i].distance;
     }
 
-    auto update = [&renderables, &gameObjects](double t, double dt) {
-        for (auto i = 1; i < renderables.size(); ++i) {
-            renderables[i].position = {static_cast<float>(glm::sin(gameObjects[i].speed * t)
-                                                          * gameObjects[i].distance),
-                                       0.0,
-                                       static_cast<float>(glm::cos(gameObjects[i].speed * t)
-                                                          * gameObjects[i].distance)};
-        }
+    auto update = [&gameObjects](double t, double dt) {
+        // for (auto i = 1; i < renderables.size(); ++i) {
+        //     renderables[i].position
+        //         = {static_cast<float>(glm::sin(gameObjects[i].speed * t) * gameObjects[i].distance),
+        //            0.0,
+        //            static_cast<float>(glm::cos(gameObjects[i].speed * t) * gameObjects[i].distance)};
+        // }
     };
 
     graphics.beginRenderLoop(passes, cPasses, update);
