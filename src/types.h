@@ -99,4 +99,11 @@ struct MeshRenderer
     float roughness = 1.;
 };
 
+struct Camera
+{
+    float nearPlane = 0.1f;
+    float farPlane = 100.0f;
+    float fov = 60.0f;
+};
+
 #endif // TYPES_H

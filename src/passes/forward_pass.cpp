@@ -119,27 +119,31 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
 
     // Update uniform buffer
     {
+        auto *cameraTransform = m_world->getComponent<Transform>(m_camera);
+        auto *cameraData = m_world->getComponent<Camera>(m_camera);
+
         m_projection = glm::perspectiveZO(
-            glm::radians(60.0f),
+            glm::radians(cameraData->fov),
             static_cast<float>(m_graphics->getSwapchainSize().width)
                 / static_cast<float>(m_graphics->getSwapchainSize().height),
-            0.1f,
-            1000.0f);
+            cameraData->nearPlane,
+            cameraData->farPlane);
 
         glm::vec3 front;
-        front.x = cos(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
-        front.y = sin(glm::radians(m_pitch));
-        front.z = sin(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
+        front.x = cos(glm::radians(cameraTransform->rotation.y)) * cos(glm::radians(cameraTransform->rotation.x));
+        front.y = sin(glm::radians(cameraTransform->rotation.x));
+        front.z = sin(glm::radians(cameraTransform->rotation.y)) * cos(glm::radians(cameraTransform->rotation.x));
 
         glm::vec3 right = glm::normalize(glm::cross(front, {0, 1, 0}));
         glm::vec3 up = glm::cross(right, front);
 
-        m_view = glm::lookAt(m_cameraPosition, m_cameraPosition + front, up);
+        glm::vec3 pos = {cameraTransform->position.x, cameraTransform->position.y, cameraTransform->position.z};
+        m_view = glm::lookAt(pos, pos + front, up);
         m_constants
             = {m_view,
                m_projection,
                m_lightVP,
-               glm::vec4(m_cameraPosition.x, m_cameraPosition.y, m_cameraPosition.z, 0),
+               glm::vec4(cameraTransform->position.x, cameraTransform->position.y, cameraTransform->position.z, 0),
                glm::vec4(m_lightPosition, 0.),
                0};
 
@@ -281,21 +285,26 @@ void ForwardPass::setLightVPMatrix(glm::mat4 lightVP)
     m_lightVP = lightVP;
 }
 
-void ForwardPass::setCameraPosition(glm::vec3 position)
+void ForwardPass::setCamera(Entity camera)
 {
-    m_cameraPosition = position;
+    m_camera = camera;
 }
 
-void ForwardPass::translateCamera(glm::vec3 position)
-{
-    m_cameraPosition += position;
-}
-
-void ForwardPass::rotateCamera(float yaw, float pitch)
-{
-    m_yaw += yaw;
-    m_pitch += pitch;
-}
+// void ForwardPass::setCameraPosition(glm::vec3 position)
+// {
+//     cameraTransform->position = position;
+// }
+//
+// void ForwardPass::translateCamera(glm::vec3 position)
+// {
+//     cameraTransform->position += position;
+// }
+//
+// void ForwardPass::rotateCamera(float yaw, float pitch)
+// {
+//     cameraTransform->rotation.y += yaw;
+//     cameraTransform->rotation.x += pitch;
+// }
 
 void ForwardPass::setLightDirection(glm::vec3 lightPos)
 {
