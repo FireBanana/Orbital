@@ -1,6 +1,6 @@
+#include "forward_pass.h"
 #include "../global.h"
 #include "../graphics.h"
-#include "forward_pass.h"
 #include <iostream>
 
 ForwardPass::ForwardPass(Graphics *graphics)
@@ -130,20 +130,29 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
             cameraData->farPlane);
 
         glm::vec3 front;
-        front.x = cos(glm::radians(cameraTransform->rotation.y)) * cos(glm::radians(cameraTransform->rotation.x));
+        front.x = cos(glm::radians(cameraTransform->rotation.y))
+                  * cos(glm::radians(cameraTransform->rotation.x));
         front.y = sin(glm::radians(cameraTransform->rotation.x));
-        front.z = sin(glm::radians(cameraTransform->rotation.y)) * cos(glm::radians(cameraTransform->rotation.x));
+        front.z = sin(glm::radians(cameraTransform->rotation.y))
+                  * cos(glm::radians(cameraTransform->rotation.x));
 
         glm::vec3 right = glm::normalize(glm::cross(front, {0, 1, 0}));
         glm::vec3 up = glm::cross(right, front);
 
-        glm::vec3 pos = {cameraTransform->position.x, cameraTransform->position.y, cameraTransform->position.z};
+        glm::vec3 pos
+            = {cameraTransform->position.x,
+               cameraTransform->position.y,
+               cameraTransform->position.z};
         m_view = glm::lookAt(pos, pos + front, up);
         m_constants
             = {m_view,
                m_projection,
                m_lightVP,
-               glm::vec4(cameraTransform->position.x, cameraTransform->position.y, cameraTransform->position.z, 0),
+               glm::vec4(
+                   cameraTransform->position.x,
+                   cameraTransform->position.y,
+                   cameraTransform->position.z,
+                   0),
                glm::vec4(m_lightPosition, 0.),
                0};
 
@@ -243,10 +252,15 @@ void ForwardPass::render(VkCommandBuffer *cmd, uint32_t imgIndex)
             }
 
             // Precompute this once as this is also being used in shadows
+            auto md = glm::mat4(1.0f);
+            auto r = glm::rotate(md, glm::radians(tr->rotation.x), {1, 0, 0})
+                     * glm::rotate(md, glm::radians(tr->rotation.y), {0, 1, 0})
+                     * glm::rotate(md, glm::radians(tr->rotation.z), {0, 0, 1});
             ModelConstants
                 mc{glm::translate(
                        model.worldTransform,
-                       glm::vec3(tr->position.x, tr->position.y, tr->position.z)),
+                       glm::vec3(tr->position.x, tr->position.y, tr->position.z))
+                       * r * glm::scale(md, glm::vec3(tr->scale)),
                    glm::vec4{mesh->roughness, 0., 0., 0.}};
 
             vkCmdPushConstants(

@@ -12,6 +12,8 @@
 struct vec3
 {
     float x, y, z;
+
+    operator glm::vec3() const { return {x, y, z}; }
 };
 
 struct vec4
@@ -86,11 +88,11 @@ struct Model
 
 // Components
 
-struct Transform 
+struct Transform
 {
     vec3 position;
     vec3 rotation;
-    vec3 scale {1,1,1};
+    vec3 scale{1, 1, 1};
 };
 
 struct MeshRenderer
